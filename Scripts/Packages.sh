@@ -16,13 +16,16 @@ UPDATE_PACKAGE() {
 
 	# 删除本地可能存在的不同名称的软件包
 	for NAME in "${PKG_LIST[@]}"; do
-		# 查找匹配的目录
+		# 查找 feed 源目录以及 feeds install -a 留下的旧链接/目录。
+		# 同名旧链接会让自定义包（尤其是 sing-box）在 make defconfig 时被忽略。
 		echo "Search directory: $NAME"
-		local FOUND_DIRS=$(find ./feeds/luci/ ./feeds/packages/ -maxdepth 3 -type d -iname "*$NAME*" 2>/dev/null)
+		local FOUND_DIRS=$(find ./feeds/luci/ ./feeds/packages/ ./package/feeds/luci/ ./package/feeds/packages/ \
+			-maxdepth 3 \( -type d -o -type l \) -iname "*$NAME*" 2>/dev/null)
 
-		# 删除找到的目录
+		# 删除找到的目录或链接
 		if [ -n "$FOUND_DIRS" ]; then
-			while read -r DIR; do
+			while IFS= read -r DIR; do
+				[ -n "$DIR" ] || continue
 				rm -rf "$DIR"
 				echo "Delete directory: $DIR"
 			done <<< "$FOUND_DIRS"
