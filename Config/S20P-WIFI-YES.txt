@@ -249,4 +249,4 @@ CONFIG_DOCKER_NET_MACVLAN=y
 CONFIG_DOCKER_NET_TFTP=y
 CONFIG_DOCKER_STO_EXT4=y
 CONFIG_DOCKER_STO_BTRFS=y
-
+# CI probe: trigger one authorized cloud build; no package selection change.
