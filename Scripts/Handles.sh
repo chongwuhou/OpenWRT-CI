@@ -64,11 +64,12 @@ if [ -f "$SING_BOX_MAKE" ] && grep -q '^  GO_PKG_TAGS:=http2legacy,' "$SING_BOX_
 			'--- a/protocol/naive/outbound.go' \
 			'+++ b/protocol/naive/outbound.go' \
 			'@@ -9,7 +9,6 @@ import (' \
-			
+			$'	"github.com/sagernet/cronet-go"' \
+			$'-	_ "github.com/sagernet/cronet-go/all"' \
+			$'	"github.com/sagernet/sing-box/adapter"' \
 			> "$PACKAGE_PATH/sing-box/patches/100-use-system-libcronet.patch"
 	fi
 fi
-
 # OpenAppFilter：Linux 6.18 将 del_timer_sync() 更名为 timer_delete_sync()。
 # 同时补入 timer.h，并递归处理实际复制后的源码路径。
 while IFS= read -r OAF_SRC; do
