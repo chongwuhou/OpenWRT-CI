@@ -251,3 +251,4 @@ CONFIG_DOCKER_STO_EXT4=y
 CONFIG_DOCKER_STO_BTRFS=y
 # CI probe: trigger one authorized cloud build; no package selection change.
 # CI probe 2: verify OpenAppFilter Linux 6.18 compatibility fix.
+# CI probe 3: verify recursive OpenAppFilter Linux 6.18 patch.
