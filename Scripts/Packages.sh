@@ -36,16 +36,20 @@ UPDATE_PACKAGE() {
 
 	# 处理克隆的仓库
 	if [[ "$PKG_SPECIAL" == "pkg" ]]; then
+		local KEEP_REPO=false
 		# 主包和第5个参数列出的附属包都要复制，避免只得到 LuCI 界面而漏掉运行依赖。
 		for NAME in "${PKG_LIST[@]}"; do
 			# 兼容“仓库根目录就是一个包”的独立仓库，也兼容多包大杂烩仓库。
 			if [ -f "$REPO_PATH/Makefile" ] && grep -q "define Package/$NAME" "$REPO_PATH/Makefile"; then
-				cp -rf "$REPO_PATH" "./package/$NAME"
+				# REPO_PATH 已经位于 package/ 下，直接保留，不能复制后再删除自身。
+				KEEP_REPO=true
 			else
 				find "$REPO_PATH" -mindepth 1 -maxdepth 4 -type d -iname "*$NAME*" -prune -exec cp -rf {} ./package \;
 			fi
 		done
-		rm -rf $REPO_PATH
+		if [[ "$KEEP_REPO" != true ]]; then
+			rm -rf "$REPO_PATH"
+		fi
 	fi
 }
 
