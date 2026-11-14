@@ -38,7 +38,12 @@ UPDATE_PACKAGE() {
 	if [[ "$PKG_SPECIAL" == "pkg" ]]; then
 		# 主包和第5个参数列出的附属包都要复制，避免只得到 LuCI 界面而漏掉运行依赖。
 		for NAME in "${PKG_LIST[@]}"; do
-			find "$REPO_PATH" -mindepth 1 -maxdepth 4 -type d -iname "*$NAME*" -prune -exec cp -rf {} ./package \;
+			# 兼容“仓库根目录就是一个包”的独立仓库，也兼容多包大杂烩仓库。
+			if [ -f "$REPO_PATH/Makefile" ] && grep -q "define Package/$NAME" "$REPO_PATH/Makefile"; then
+				cp -rf "$REPO_PATH" "./package/$NAME"
+			else
+				find "$REPO_PATH" -mindepth 1 -maxdepth 4 -type d -iname "*$NAME*" -prune -exec cp -rf {} ./package \;
+			fi
 		done
 		rm -rf $REPO_PATH
 	fi
