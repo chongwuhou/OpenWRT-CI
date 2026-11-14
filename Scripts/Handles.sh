@@ -92,6 +92,21 @@ while IFS= read -r OAF_SRC; do
 	fi
 done < <(find "$PACKAGE_PATH" -type f -name 'app_filter.c' 2>/dev/null)
 
+# v2ray-geodata：Download 宏在多个子包并行 Prepare 时仍可能重复触发网络下载。
+# Download Packages 阶段已完成强校验预取，这里只消费本地缓存，避免编译阶段再次访问 GitHub。
+GEO_MAKE="$FEEDS_PATH/packages/net/v2ray-geodata/Makefile"
+if [ -f "$GEO_MAKE" ] && grep -q '\$(call Download,geoip)' "$GEO_MAKE"; then
+	PATCH_GEODATA() {
+		awk '
+			index($0, "$(call Download,geoip)") { print "\\t@test -s $(DL_DIR)/$(GEOIP_FILE) || { echo v2ray-geoip-prefetch-missing; exit 1; }"; next }
+			index($0, "$(call Download,geosite)") { print "\\t@test -s $(DL_DIR)/$(GEOSITE_FILE) || { echo v2ray-geosite-prefetch-missing; exit 1; }"; next }
+			index($0, "$(call Download,geosite-ir)") { print "\\t@test -s $(DL_DIR)/$(GEOSITE_IRAN_FILE) || { echo v2ray-geosite-ir-prefetch-missing; exit 1; }"; next }
+			{ print }
+		' "$GEO_MAKE" > "$GEO_MAKE.tmp" && mv "$GEO_MAKE.tmp" "$GEO_MAKE"
+	}
+	FIX "v2ray-geodata-prefetch-only" "$FEEDS_PATH/packages/net/v2ray-geodata" PATCH_GEODATA
+fi
+
 # Docker + fw4：避免 dockerd 每次开机都重复 uciadd/reload_config，触发重复的 docker_devices 定义。
 DOCKER_INIT="$FEEDS_PATH/packages/utils/dockerd/files/dockerd.init"
 if [ -f "$DOCKER_INIT" ] && grep -q $'^\tuciadd$' "$DOCKER_INIT"; then
