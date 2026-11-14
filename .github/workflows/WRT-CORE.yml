@@ -210,6 +210,40 @@ jobs:
 
           make download -j$(nproc)
 
+          # v2ray-geodata 在 Build/Prepare 中按需下载，make download 不会提前取这些数据文件。
+          # 先用可重试的 curl 下载并校验，避免并行编译时大文件下载卡住到最后才失败。
+          GEO_MAKE="feeds/packages/net/v2ray-geodata/Makefile"
+          if [ -f "$GEO_MAKE" ]; then
+            download_geo() {
+              local package="$1"
+              local version="$2"
+              local file="$3"
+              local hash="$4"
+              local url="$5"
+              if grep -q "^CONFIG_PACKAGE_$package=y" .config; then
+                if [ ! -f "dl/$file" ]; then
+                  curl --fail --location --retry 5 --retry-delay 3 --retry-all-errors \
+                    "$url" -o "dl/$file"
+                fi
+                echo "$hash  dl/$file" | sha256sum -c -
+              fi
+            }
+
+            GEOIP_VER=$(sed -n 's/^GEOIP_VER:=//p' "$GEO_MAKE")
+            GEOIP_HASH=$(sed -n '/^define Download\/geoip/,/^endef/ s/^  HASH:=//p' "$GEO_MAKE")
+            GEOSITE_VER=$(sed -n 's/^GEOSITE_VER:=//p' "$GEO_MAKE")
+            GEOSITE_HASH=$(sed -n '/^define Download\/geosite/,/^endef/ s/^  HASH:=//p' "$GEO_MAKE")
+            GEOSITE_IRAN_VER=$(sed -n 's/^GEOSITE_IRAN_VER:=//p' "$GEO_MAKE")
+            GEOSITE_IRAN_HASH=$(sed -n '/^define Download\/geosite-ir/,/^endef/ s/^  HASH:=//p' "$GEO_MAKE")
+
+            download_geo "v2ray-geoip" "$GEOIP_VER" "geoip.dat.$GEOIP_VER" "$GEOIP_HASH" \
+              "https://github.com/v2fly/geoip/releases/download/$GEOIP_VER/geoip.dat"
+            download_geo "v2ray-geosite" "$GEOSITE_VER" "dlc.dat.$GEOSITE_VER" "$GEOSITE_HASH" \
+              "https://github.com/v2fly/domain-list-community/releases/download/$GEOSITE_VER/dlc.dat"
+            download_geo "v2ray-geosite-ir" "$GEOSITE_IRAN_VER" "iran.dat.$GEOSITE_IRAN_VER" "$GEOSITE_IRAN_HASH" \
+              "https://github.com/bootmortis/iran-hosted-domains/releases/download/$GEOSITE_IRAN_VER/iran.dat"
+          fi
+
       - name: Compile Firmware
         if: ${{ !inputs.WRT_TEST }}
         run: |
