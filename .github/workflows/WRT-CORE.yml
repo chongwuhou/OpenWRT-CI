@@ -187,7 +187,8 @@ jobs:
           if [[ "${WRT_CONFIG,,}" == *"test"* ]]; then
             cat $GITHUB_WORKSPACE/Config/$WRT_CONFIG.txt >> .config
           else
-            cat $GITHUB_WORKSPACE/Config/$WRT_CONFIG.txt $GITHUB_WORKSPACE/Config/GENERAL.txt >> .config
+            # 通用配置先写入，目标配置后写入，保证 S20P 等设备专属选项优先。
+            cat $GITHUB_WORKSPACE/Config/GENERAL.txt $GITHUB_WORKSPACE/Config/$WRT_CONFIG.txt >> .config
           fi
 
           $GITHUB_WORKSPACE/Scripts/Settings.sh
