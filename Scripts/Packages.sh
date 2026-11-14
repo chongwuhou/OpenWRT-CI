@@ -36,7 +36,10 @@ UPDATE_PACKAGE() {
 
 	# 处理克隆的仓库
 	if [[ "$PKG_SPECIAL" == "pkg" ]]; then
-		find $REPO_PATH/*/ -maxdepth 3 -type d -iname "*$PKG_NAME*" -prune -exec cp -rf {} ./package \;
+		# 主包和第5个参数列出的附属包都要复制，避免只得到 LuCI 界面而漏掉运行依赖。
+		for NAME in "${PKG_LIST[@]}"; do
+			find "$REPO_PATH" -mindepth 1 -maxdepth 4 -type d -iname "*$NAME*" -prune -exec cp -rf {} ./package \;
+		done
 		rm -rf $REPO_PATH
 	fi
 }
