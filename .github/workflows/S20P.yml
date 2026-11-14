@@ -4,6 +4,10 @@
 name: S20P
 
 on:
+  # 临时受控触发：仅用于本次用户授权的云编译，完成后恢复。
+  push:
+    paths:
+      - Config/S20P-WIFI-YES.txt
   workflow_dispatch:
     inputs:
       PACKAGE:
