@@ -64,9 +64,90 @@ if [ -f "$SING_BOX_MAKE" ] && grep -q '^  GO_PKG_TAGS:=http2legacy,' "$SING_BOX_
 			'--- a/protocol/naive/outbound.go' \
 			'+++ b/protocol/naive/outbound.go' \
 			'@@ -9,7 +9,6 @@ import (' \
-			' "github.com/sagernet/cronet-go"' \
-			'-\t_ "github.com/sagernet/cronet-go/all"' \
-			' "github.com/sagernet/sing-box/adapter"' \
+			
+			> "$PACKAGE_PATH/sing-box/patches/100-use-system-libcronet.patch"
+	fi
+fi
+
+# OpenAppFilter：Linux 6.18 将 del_timer_sync() 更名为 timer_delete_sync()。
+# 同时补入 timer.h，并递归处理实际复制后的源码路径。
+while IFS= read -r OAF_SRC; do
+	if grep -q 'del_timer_sync' "$OAF_SRC"; then
+		if ! grep -q '^#include <linux/timer.h>$' "$OAF_SRC"; then
+			FIX "oaf-kernel-6.18-timer-header" "$(dirname "$OAF_SRC")" sed -i \
+				'1i #include <linux/timer.h>' \
+				"$OAF_SRC"
+		fi
+		FIX "oaf-kernel-6.18-timer-api" "$(dirname "$OAF_SRC")" sed -i \
+			's/del_timer_sync(&oaf_timer);/timer_delete_sync(\&oaf_timer);/' \
+			"$OAF_SRC"
+	fi
+done < <(find "$PACKAGE_PATH" -type f -name 'app_filter.c' 2>/dev/null)
+
+# Docker + fw4：避免 dockerd 每次开机都重复 uciadd/reload_config，触发重复的 docker_devices 定义。
+DOCKER_INIT="$FEEDS_PATH/packages/utils/dockerd/files/dockerd.init"
+if [ -f "$DOCKER_INIT" ] && grep -q $'^\tuciadd$' "$DOCKER_INIT"; then
+	FIX "dockerd-fw4-boot" "$FEEDS_PATH/packages/utils/dockerd" sed -i \
+		'/^boot() {/,/^}/ s/^[[:space:]]*uciadd$/	if ! uci_quiet get network.docker || ! uci_quiet get firewall.docker; then\n		uciadd\n	fi/' \
+		"$DOCKER_INIT"
+fi
+\t"github.com/sagernet/cronet-go"' \
+			
+			> "$PACKAGE_PATH/sing-box/patches/100-use-system-libcronet.patch"
+	fi
+fi
+
+# OpenAppFilter：Linux 6.18 将 del_timer_sync() 更名为 timer_delete_sync()。
+# 同时补入 timer.h，并递归处理实际复制后的源码路径。
+while IFS= read -r OAF_SRC; do
+	if grep -q 'del_timer_sync' "$OAF_SRC"; then
+		if ! grep -q '^#include <linux/timer.h>$' "$OAF_SRC"; then
+			FIX "oaf-kernel-6.18-timer-header" "$(dirname "$OAF_SRC")" sed -i \
+				'1i #include <linux/timer.h>' \
+				"$OAF_SRC"
+		fi
+		FIX "oaf-kernel-6.18-timer-api" "$(dirname "$OAF_SRC")" sed -i \
+			's/del_timer_sync(&oaf_timer);/timer_delete_sync(\&oaf_timer);/' \
+			"$OAF_SRC"
+	fi
+done < <(find "$PACKAGE_PATH" -type f -name 'app_filter.c' 2>/dev/null)
+
+# Docker + fw4：避免 dockerd 每次开机都重复 uciadd/reload_config，触发重复的 docker_devices 定义。
+DOCKER_INIT="$FEEDS_PATH/packages/utils/dockerd/files/dockerd.init"
+if [ -f "$DOCKER_INIT" ] && grep -q $'^\tuciadd$' "$DOCKER_INIT"; then
+	FIX "dockerd-fw4-boot" "$FEEDS_PATH/packages/utils/dockerd" sed -i \
+		'/^boot() {/,/^}/ s/^[[:space:]]*uciadd$/	if ! uci_quiet get network.docker || ! uci_quiet get firewall.docker; then\n		uciadd\n	fi/' \
+		"$DOCKER_INIT"
+fi
+-\t_ "github.com/sagernet/cronet-go/all"' \
+			
+			> "$PACKAGE_PATH/sing-box/patches/100-use-system-libcronet.patch"
+	fi
+fi
+
+# OpenAppFilter：Linux 6.18 将 del_timer_sync() 更名为 timer_delete_sync()。
+# 同时补入 timer.h，并递归处理实际复制后的源码路径。
+while IFS= read -r OAF_SRC; do
+	if grep -q 'del_timer_sync' "$OAF_SRC"; then
+		if ! grep -q '^#include <linux/timer.h>$' "$OAF_SRC"; then
+			FIX "oaf-kernel-6.18-timer-header" "$(dirname "$OAF_SRC")" sed -i \
+				'1i #include <linux/timer.h>' \
+				"$OAF_SRC"
+		fi
+		FIX "oaf-kernel-6.18-timer-api" "$(dirname "$OAF_SRC")" sed -i \
+			's/del_timer_sync(&oaf_timer);/timer_delete_sync(\&oaf_timer);/' \
+			"$OAF_SRC"
+	fi
+done < <(find "$PACKAGE_PATH" -type f -name 'app_filter.c' 2>/dev/null)
+
+# Docker + fw4：避免 dockerd 每次开机都重复 uciadd/reload_config，触发重复的 docker_devices 定义。
+DOCKER_INIT="$FEEDS_PATH/packages/utils/dockerd/files/dockerd.init"
+if [ -f "$DOCKER_INIT" ] && grep -q $'^\tuciadd$' "$DOCKER_INIT"; then
+	FIX "dockerd-fw4-boot" "$FEEDS_PATH/packages/utils/dockerd" sed -i \
+		'/^boot() {/,/^}/ s/^[[:space:]]*uciadd$/	if ! uci_quiet get network.docker || ! uci_quiet get firewall.docker; then\n		uciadd\n	fi/' \
+		"$DOCKER_INIT"
+fi
+\t"github.com/sagernet/sing-box/adapter"' \
 			> "$PACKAGE_PATH/sing-box/patches/100-use-system-libcronet.patch"
 	fi
 fi
