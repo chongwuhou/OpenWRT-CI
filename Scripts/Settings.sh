@@ -31,6 +31,12 @@ echo "CONFIG_PACKAGE_luci-theme-$WRT_THEME=y" >> ./.config
 echo "CONFIG_PACKAGE_luci-app-$WRT_THEME=y" >> ./.config
 echo "CONFIG_PACKAGE_luci-app-$WRT_THEME-config=y" >> ./.config
 
+# S20P 只输出 Super Gateway S20P，覆盖 GENERAL.txt 中的通用多设备设置。
+if [[ "$WRT_CONFIG" == "S20P-WIFI-YES" ]]; then
+	echo "CONFIG_TARGET_MULTI_PROFILE=n" >> ./.config
+	echo "CONFIG_TARGET_PER_DEVICE_ROOTFS=n" >> ./.config
+fi
+
 #引入私有扩展配置
 if [ -f "$GITHUB_WORKSPACE/Config/PRIVATE.txt" ]; then
 	echo "Applying private configurations from PRIVATE.txt..."
