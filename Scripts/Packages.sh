@@ -59,8 +59,20 @@ UPDATE_PACKAGE "vantage" "anothaDev/luci-theme-vantage" "main"
 UPDATE_PACKAGE "momo" "nikkinikki-org/OpenWrt-momo" "main"
 UPDATE_PACKAGE "nikki" "nikkinikki-org/OpenWrt-nikki" "main"
 UPDATE_PACKAGE "openclash" "vernesong/OpenClash" "dev" "pkg"
+UPDATE_PACKAGE "luci-app-ssr-plus" "fw876/helloworld" "master" "pkg"
 UPDATE_PACKAGE "passwall" "Openwrt-Passwall/openwrt-passwall" "main" "pkg"
 UPDATE_PACKAGE "passwall2" "Openwrt-Passwall/openwrt-passwall2" "main" "pkg"
+
+# S20P 参考固件中的应用与管理组件
+UPDATE_PACKAGE "luci-app-store" "linkease/istore" "main" "pkg" "luci-lib-taskd luci-lib-xterm taskd"
+UPDATE_PACKAGE "ddnsto" "linkease/nas-packages" "master" "pkg"
+UPDATE_PACKAGE "luci-app-ddnsto" "linkease/nas-packages-luci" "main" "pkg"
+UPDATE_PACKAGE "luci-app-oaf" "OpenWrt-Actions/OpenAppFilter" "master" "pkg" "appfilter oaf"
+UPDATE_PACKAGE "luci-app-nps" "djylb/nps-openwrt" "main" "pkg" "npc nps"
+
+# Docker 管理界面；运行时由 ImmortalWrt packages 提供 dockerd/docker/compose
+UPDATE_PACKAGE "luci-lib-docker" "lisaac/luci-lib-docker" "master" "pkg"
+UPDATE_PACKAGE "luci-app-dockerman" "lisaac/luci-app-dockerman" "master" "pkg"
 
 UPDATE_PACKAGE "diskmanager" "4IceG/luci-app-mini-diskmanager" "main"
 UPDATE_PACKAGE "easytier" "EasyTier/luci-app-easytier" "main"
@@ -140,3 +152,4 @@ UPDATE_VERSION() {
 if [ -f "$GITHUB_WORKSPACE/Scripts/PRIVATE.sh" ]; then
 	source "$GITHUB_WORKSPACE/Scripts/PRIVATE.sh"
 fi
+
