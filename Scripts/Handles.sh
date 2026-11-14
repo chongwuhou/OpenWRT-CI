@@ -58,7 +58,12 @@ if [ -f "$SING_BOX_MAKE" ] && grep -q '^  GO_PKG_TAGS:=http2legacy,' "$SING_BOX_
 	FIX "sing-box-naive-tag" "$PACKAGE_PATH/sing-box" sed -i \
 		's|^  GO_PKG_TAGS:=http2legacy,with_acme,with_clash_api,with_dhcp,with_gvisor,with_quic,with_tailscale,with_utls,with_wireguard$|  GO_PKG_TAGS:=http2legacy,with_acme,with_clash_api,with_dhcp,with_gvisor,with_naive_outbound,with_quic,with_tailscale,with_utls,with_wireguard|' \
 		"$SING_BOX_MAKE"
-	if ! grep -q '^  TARGET_LDFLAGS += -lcronet
+	if ! grep -q 'TARGET_LDFLAGS += -lcronet' "$SING_BOX_MAKE"; then
+		FIX "sing-box-naive-link" "$PACKAGE_PATH/sing-box" sed -i \
+			'/^define Package\/sing-box\/conffiles/i ifneq ($(findstring with_naive_outbound,$(GO_PKG_TAGS)),)\n  TARGET_LDFLAGS += -lcronet\nendif\n' \
+		"$SING_BOX_MAKE"
+	fi
+	mkdir -p "$PACKAGE_PATH/sing-box/patches"
 	if [ ! -f "$PACKAGE_PATH/sing-box/patches/100-use-system-libcronet.patch" ]; then
 		printf '%s\n' \
 			'--- a/protocol/naive/outbound.go' \
