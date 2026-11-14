@@ -49,24 +49,24 @@ FIX "natmapt" "$PACKAGE_PATH/luci-app-natmapt" sed -i "s/network/services/g" \
 # 使用 ImmortalWrt 的系统 libcronet，避免依赖内置平台库；PassWall 才会显示 sing-box/Naive 协议。
 SING_BOX_MAKE="$PACKAGE_PATH/sing-box/Makefile"
 if [ -f "$SING_BOX_MAKE" ] && grep -q '^  GO_PKG_TAGS:=http2legacy,' "$SING_BOX_MAKE" && ! grep -q 'with_naive_outbound' "$SING_BOX_MAKE"; then
-	FIX "sing-box-naive-dep" "$PACKAGE_PATH/sing-box" sed -i \\
-		's|^  DEPENDS+= +kmod-netlink-diag +kmod-tun$|  DEPENDS+= +kmod-netlink-diag +kmod-tun +libcronet|' \\
+	FIX "sing-box-naive-dep" "$PACKAGE_PATH/sing-box" sed -i \
+		's|^  DEPENDS+= +kmod-netlink-diag +kmod-tun$|  DEPENDS+= +kmod-netlink-diag +kmod-tun +libcronet|' \
 		"$SING_BOX_MAKE"
-	FIX "sing-box-checklinkname" "$PACKAGE_PATH/sing-box" sed -i \\
-		'/^GO_PKG_LDFLAGS_X:=/i GO_PKG_LDFLAGS:=-checklinkname=0' \\
+	FIX "sing-box-checklinkname" "$PACKAGE_PATH/sing-box" sed -i \
+		'/^GO_PKG_LDFLAGS_X:=/i GO_PKG_LDFLAGS:=-checklinkname=0' \
 		"$SING_BOX_MAKE"
-	FIX "sing-box-naive-tag" "$PACKAGE_PATH/sing-box" sed -i \\
-		's|^  GO_PKG_TAGS:=http2legacy,with_acme,with_clash_api,with_dhcp,with_gvisor,with_quic,with_tailscale,with_utls,with_wireguard$|  GO_PKG_TAGS:=http2legacy,with_acme,with_clash_api,with_dhcp,with_gvisor,with_naive_outbound,with_quic,with_tailscale,with_utls,with_wireguard|' \\
+	FIX "sing-box-naive-tag" "$PACKAGE_PATH/sing-box" sed -i \
+		's|^  GO_PKG_TAGS:=http2legacy,with_acme,with_clash_api,with_dhcp,with_gvisor,with_quic,with_tailscale,with_utls,with_wireguard$|  GO_PKG_TAGS:=http2legacy,with_acme,with_clash_api,with_dhcp,with_gvisor,with_naive_outbound,with_quic,with_tailscale,with_utls,with_wireguard|' \
 		"$SING_BOX_MAKE"
 	mkdir -p "$PACKAGE_PATH/sing-box/patches"
 	if [ ! -f "$PACKAGE_PATH/sing-box/patches/100-use-system-libcronet.patch" ]; then
-		printf '%s\\n' \\
-			'--- a/protocol/naive/outbound.go' \\
-			'+++ b/protocol/naive/outbound.go' \\
-			'@@ -9,7 +9,6 @@ import (' \\
-			' \\"github.com/sagernet/cronet-go\\"' \\
-			'-\\t_ \\"github.com/sagernet/cronet-go/all\\"' \\
-			' \\"github.com/sagernet/sing-box/adapter\\"' \\
+		printf '%s\n' \
+			'--- a/protocol/naive/outbound.go' \
+			'+++ b/protocol/naive/outbound.go' \
+			'@@ -9,7 +9,6 @@ import (' \
+			' "github.com/sagernet/cronet-go"' \
+			'-\t_ "github.com/sagernet/cronet-go/all"' \
+			' "github.com/sagernet/sing-box/adapter"' \
 			> "$PACKAGE_PATH/sing-box/patches/100-use-system-libcronet.patch"
 	fi
 fi
