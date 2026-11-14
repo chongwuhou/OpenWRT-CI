@@ -45,14 +45,15 @@ FIX "mini-diskmanager" "$PACKAGE_PATH/luci-app-mini-diskmanager" sed -i "s/servi
 FIX "natmapt" "$PACKAGE_PATH/luci-app-natmapt" sed -i "s/network/services/g" \
 	"$PACKAGE_PATH/luci-app-natmapt/root/usr/share/luci/menu.d/luci-app-natmap.json"
 
-# OpenAppFilter 当前源码在 Linux 6.18 下漏包含 timer.h，导致 del_timer_sync() 无声明。
-# 只在源码确实存在且尚未修补时插入，避免重复修改。
-OAF_SRC="$PACKAGE_PATH/oaf/src/app_filter.c"
-if [ -f "$OAF_SRC" ] && ! grep -q '^#include <linux/timer.h>$' "$OAF_SRC"; then
-	FIX "oaf-kernel-6.18-timer" "$PACKAGE_PATH/oaf" sed -i \
-		'/^#include <linux\/version.h>$/a #include <linux/timer.h>' \
-		"$OAF_SRC"
-fi
+# OpenAppFilter 在 Linux 6.18 下需要显式包含 timer.h。
+# 递归查找实际复制后的源文件，避免仓库目录层级变化导致补丁漏打。
+while IFS= read -r OAF_SRC; do
+	if grep -q 'del_timer_sync' "$OAF_SRC" && ! grep -q '^#include <linux/timer.h>$' "$OAF_SRC"; then
+		FIX "oaf-kernel-6.18-timer" "$(dirname "$OAF_SRC")" sed -i \\
+			'1i #include <linux/timer.h>' \\
+			"$OAF_SRC"
+	fi
+done < <(find "$PACKAGE_PATH" -type f -name 'app_filter.c' 2>/dev/null)
 
 # Docker + fw4：避免 dockerd 每次开机都重复 uciadd/reload_config，触发重复的 docker_devices 定义。
 DOCKER_INIT="$FEEDS_PATH/packages/utils/dockerd/files/dockerd.init"
