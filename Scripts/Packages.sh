@@ -63,6 +63,8 @@ UPDATE_PACKAGE "momo" "nikkinikki-org/OpenWrt-momo" "main"
 UPDATE_PACKAGE "nikki" "nikkinikki-org/OpenWrt-nikki" "main"
 UPDATE_PACKAGE "openclash" "vernesong/OpenClash" "dev" "pkg"
 UPDATE_PACKAGE "luci-app-ssr-plus" "fw876/helloworld" "master" "pkg"
+UPDATE_PACKAGE "dns2socks-rust" "fw876/helloworld" "master" "pkg"
+UPDATE_PACKAGE "kcptun-client" "lunatickochiya/luna-action-packages" "master" "pkg"
 UPDATE_PACKAGE "passwall" "Openwrt-Passwall/openwrt-passwall" "main" "pkg"
 UPDATE_PACKAGE "passwall2" "Openwrt-Passwall/openwrt-passwall2" "main" "pkg"
 
