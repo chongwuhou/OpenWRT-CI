@@ -47,10 +47,8 @@ FIX "natmapt" "$PACKAGE_PATH/luci-app-natmapt" sed -i "s/network/services/g" \
 
 # Docker + fw4：避免 dockerd 每次开机都重复 uciadd/reload_config，触发重复的 docker_devices 定义。
 DOCKER_INIT="$FEEDS_PATH/packages/utils/dockerd/files/dockerd.init"
-if [ -f "$DOCKER_INIT" ] && grep -q 
-^\tuciadd
- "$DOCKER_INIT"; then
+if [ -f "$DOCKER_INIT" ] && grep -q $'^\tuciadd$' "$DOCKER_INIT"; then
 	FIX "dockerd-fw4-boot" "$FEEDS_PATH/packages/utils/dockerd" sed -i \
-		'/^boot() {/,/^}/ s/^[[:space:]]*uciadd$/\tif ! uci_quiet get network.docker || ! uci_quiet get firewall.docker; then\n\t\tuciadd\n\tfi/' \
+		'/^boot() {/,/^}/ s/^[[:space:]]*uciadd$/	if ! uci_quiet get network.docker || ! uci_quiet get firewall.docker; then\n		uciadd\n	fi/' \
 		"$DOCKER_INIT"
 fi
