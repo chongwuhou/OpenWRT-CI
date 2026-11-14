@@ -10,7 +10,7 @@ UPDATE_PACKAGE() {
 	local PKG_SPECIAL=$4
 	local PKG_LIST=("$PKG_NAME" $5)  # 第5个参数为自定义名称列表
 	local REPO_NAME=${PKG_REPO#*/}
-	local REPO_PATH="./package/$REPO_NAME"
+	local REPO_PATH="./tmp/package-sources/$REPO_NAME"
 
 	echo " "
 
@@ -18,7 +18,7 @@ UPDATE_PACKAGE() {
 	for NAME in "${PKG_LIST[@]}"; do
 		# 查找匹配的目录
 		echo "Search directory: $NAME"
-		local FOUND_DIRS=$(find ./feeds/luci/ ./feeds/packages/ -maxdepth 3 -type d -iname "*$NAME*" 2>/dev/null)
+		local FOUND_DIRS=\$(find ./feeds/luci/ ./feeds/packages/ -maxdepth 3 -type d -iname "*$NAME*" 2>/dev/null)
 
 		# 删除找到的目录
 		if [ -n "$FOUND_DIRS" ]; then
@@ -32,24 +32,29 @@ UPDATE_PACKAGE() {
 	done
 
 	# 克隆 GitHub 仓库
+	mkdir -p "./tmp/package-sources"
+	rm -rf "$REPO_PATH"
 	git clone --depth=1 --single-branch --branch $PKG_BRANCH "https://github.com/$PKG_REPO.git" $REPO_PATH
 
 	# 处理克隆的仓库
 	if [[ "$PKG_SPECIAL" == "pkg" ]]; then
-		local KEEP_REPO=false
 		# 主包和第5个参数列出的附属包都要复制，避免只得到 LuCI 界面而漏掉运行依赖。
 		for NAME in "${PKG_LIST[@]}"; do
 			# 兼容“仓库根目录就是一个包”的独立仓库，也兼容多包大杂烩仓库。
 			if [ -f "$REPO_PATH/Makefile" ] && grep -q "define Package/$NAME" "$REPO_PATH/Makefile"; then
-				# REPO_PATH 已经位于 package/ 下，直接保留，不能复制后再删除自身。
-				KEEP_REPO=true
+				# 独立仓库的根目录就是包本体，复制到 OpenWrt 的 package/ 目录。
+				rm -rf "./package/$NAME"
+				cp -rf "$REPO_PATH" "./package/$NAME"
 			else
-				find "$REPO_PATH" -mindepth 1 -maxdepth 4 -type d -iname "*$NAME*" -prune -exec cp -rf {} ./package \;
+				find "$REPO_PATH" -mindepth 1 -maxdepth 4 -type d -iname "*$NAME*" -prune -exec cp -rf {} ./package \\;
 			fi
 		done
-		if [[ "$KEEP_REPO" != true ]]; then
-			rm -rf "$REPO_PATH"
-		fi
+		rm -rf "$REPO_PATH"
+	else
+		# 非 pkg 模式保留整个仓库，维持原脚本对主题和完整软件源的用法。
+		rm -rf "./package/$REPO_NAME"
+		cp -rf "$REPO_PATH" "./package/$REPO_NAME"
+		rm -rf "$REPO_PATH"
 	fi
 }
 
