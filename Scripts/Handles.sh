@@ -98,8 +98,8 @@ GEO_MAKE="$FEEDS_PATH/packages/net/v2ray-geodata/Makefile"
 if [ -f "$GEO_MAKE" ] && grep -q '\$(call Download,geoip)' "$GEO_MAKE"; then
 	PATCH_GEODATA() {
 		awk '
-			index($0, "$(call Download,geoip)") { print "\\t@test -s $(DL_DIR)/$(GEOIP_FILE) || { echo v2ray-geoip-prefetch-missing; exit 1; }"; next }
-			index($0, "$(call Download,geosite)") { print "\\t@test -s $(DL_DIR)/$(GEOSITE_FILE) || { echo v2ray-geosite-prefetch-missing; exit 1; }"; next }
+			index($0, "$(call Download,geoip)") { print sprintf("%c",9) "@test -s $(DL_DIR)/$(GEOIP_FILE) || { echo v2ray-geoip-prefetch-missing; exit 1; }"; next }
+			index($0, "$(call Download,geosite)") { print sprintf("%c",9) "@test -s $(DL_DIR)/$(GEOSITE_FILE) || { echo v2ray-geosite-prefetch-missing; exit 1; }"; next }
 			index($0, "$(call Download,geosite-ir)") { print "\\t@test -s $(DL_DIR)/$(GEOSITE_IRAN_FILE) || { echo v2ray-geosite-ir-prefetch-missing; exit 1; }"; next }
 			{ print }
 		' "$GEO_MAKE" > "$GEO_MAKE.tmp" && mv "$GEO_MAKE.tmp" "$GEO_MAKE"
