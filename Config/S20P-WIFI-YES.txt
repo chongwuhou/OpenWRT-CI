@@ -51,11 +51,18 @@ CONFIG_PACKAGE_luci-app-samba4=y
 CONFIG_PACKAGE_luci-app-upnp=y
 CONFIG_PACKAGE_luci-app-wolultra=y
 CONFIG_PACKAGE_luci-app-nlbwmon=y
+CONFIG_PACKAGE_nlbwmon=y
+CONFIG_PACKAGE_luci-lib-chartjs=y
 CONFIG_PACKAGE_luci-app-ddnsto=y
+CONFIG_PACKAGE_ddnsto=y
 CONFIG_PACKAGE_luci-app-frpc=y
 CONFIG_PACKAGE_luci-app-frps=y
+CONFIG_PACKAGE_frpc=y
+CONFIG_PACKAGE_frps=y
 CONFIG_PACKAGE_luci-app-nps=y
 CONFIG_PACKAGE_luci-app-npc=y
+CONFIG_PACKAGE_nps=y
+CONFIG_PACKAGE_npc=y
 CONFIG_PACKAGE_luci-app-oaf=y
 CONFIG_PACKAGE_appfilter=y
 CONFIG_PACKAGE_kmod-oaf=y
@@ -65,6 +72,9 @@ CONFIG_PACKAGE_tcping=y
 # LuCI 软件中心
 CONFIG_PACKAGE_luci-compat=y
 CONFIG_PACKAGE_luci-app-store=y
+CONFIG_PACKAGE_luci-lib-taskd=y
+CONFIG_PACKAGE_luci-lib-xterm=y
+CONFIG_PACKAGE_taskd=y
 
 # PassWall：启用现代 nftables 透明代理，并编译全部可用核心组件
 CONFIG_PACKAGE_luci-app-passwall=y
