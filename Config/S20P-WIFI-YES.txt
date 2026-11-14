@@ -81,7 +81,7 @@ CONFIG_PACKAGE_taskd=y
 
 # 代理前端 / iStore 的显式依赖闭包
 CONFIG_PACKAGE_firewall4=y
-CONFIG_PACKAGE_nftables=y
+CONFIG_PACKAGE_nftables-json=y
 CONFIG_PACKAGE_dnsmasq-full=y
 CONFIG_PACKAGE_ipset=y
 CONFIG_PACKAGE_kmod-nf-reject=y
@@ -225,10 +225,8 @@ CONFIG_PACKAGE_luci-lib-ip=y
 CONFIG_PACKAGE_ttyd=y
 CONFIG_PACKAGE_ca-certificates=y
 CONFIG_PACKAGE_tini=y
-CONFIG_PACKAGE_uci-firewall=y
 CONFIG_PACKAGE_btrfs-progs=y
 CONFIG_PACKAGE_libseccomp=y
-CONFIG_PACKAGE_iptables=y
 CONFIG_PACKAGE_iptables-nft=y
 CONFIG_PACKAGE_iptables-zz-legacy=y
 CONFIG_PACKAGE_iptables-mod-extra=y
@@ -236,7 +234,7 @@ CONFIG_PACKAGE_iptables-mod-conntrack-extra=y
 CONFIG_PACKAGE_iptables-mod-iprange=y
 CONFIG_PACKAGE_iptables-mod-socket=y
 CONFIG_PACKAGE_iptables-mod-tproxy=y
-CONFIG_PACKAGE_ip6tables=y
+CONFIG_PACKAGE_ip6tables-nft=y
 CONFIG_PACKAGE_ip6tables-mod-nat=y
 CONFIG_PACKAGE_kmod-ipt-raw=y
 CONFIG_PACKAGE_kmod-ipt-conntrack=y
@@ -258,3 +256,5 @@ CONFIG_DOCKER_STO_BTRFS=y
 # CI final retry: validate cleaned Handles.sh and complete the S20P build.
 # CI final retry 2: verify isolated GeoSite checksum parsing before compile.
 # CI final retry 3: bypass v2ray-geodata network prepare after verified prefetch.
+# CI final retry 4: remove stale feed links so VIKINGYFY sing-box is visible to defconfig.
+# CI final retry 4: use concrete nftables/ip6tables package variants.
