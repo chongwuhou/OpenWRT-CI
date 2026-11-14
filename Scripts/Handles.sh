@@ -49,8 +49,8 @@ FIX "natmapt" "$PACKAGE_PATH/luci-app-natmapt" sed -i "s/network/services/g" \
 # 递归查找实际复制后的源文件，避免仓库目录层级变化导致补丁漏打。
 while IFS= read -r OAF_SRC; do
 	if grep -q 'del_timer_sync' "$OAF_SRC" && ! grep -q '^#include <linux/timer.h>$' "$OAF_SRC"; then
-		FIX "oaf-kernel-6.18-timer" "$(dirname "$OAF_SRC")" sed -i \\
-			'1i #include <linux/timer.h>' \\
+		FIX "oaf-kernel-6.18-timer" "$(dirname "$OAF_SRC")" sed -i \
+			'1i #include <linux/timer.h>' \
 			"$OAF_SRC"
 	fi
 done < <(find "$PACKAGE_PATH" -type f -name 'app_filter.c' 2>/dev/null)
