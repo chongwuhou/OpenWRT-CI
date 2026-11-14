@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: MIT
+# S20P 专用编译入口：只生成 Super Gateway S20P 固件
+
+name: S20P
+
+on:
+  workflow_dispatch:
+    inputs:
+      PACKAGE:
+        description: '临时追加软件包配置，每行一个 CONFIG_PACKAGE_* 项'
+        required: false
+        type: string
+      TEST:
+        description: '只生成配置，不编译固件'
+        default: false
+        required: false
+        type: boolean
+
+permissions: write-all
+
+jobs:
+  config:
+    name: S20P-WIFI-YES
+    uses: ./.github/workflows/WRT-CORE.yml
+    with:
+      WRT_CONFIG: S20P-WIFI-YES
+      WRT_THEME: vantage
+      WRT_NAME: S20P
+      WRT_SSID: S20P
+      WRT_WORD: 12345678
+      WRT_IP: 192.168.10.1
+      WRT_PW: 无
+      WRT_REPO: https://github.com/VIKINGYFY/immortalwrt.git
+      WRT_BRANCH: owrt
+      WRT_SOURCE: VIKINGYFY/immortalwrt
+      WRT_PACKAGE: ${{inputs.PACKAGE}}
+      WRT_TEST: ${{inputs.TEST || false}}
+
