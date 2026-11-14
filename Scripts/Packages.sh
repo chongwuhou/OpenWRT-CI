@@ -64,7 +64,8 @@ UPDATE_PACKAGE "nikki" "nikkinikki-org/OpenWrt-nikki" "main"
 UPDATE_PACKAGE "openclash" "vernesong/OpenClash" "dev" "pkg"
 UPDATE_PACKAGE "luci-app-ssr-plus" "fw876/helloworld" "master" "pkg"
 UPDATE_PACKAGE "dns2socks-rust" "fw876/helloworld" "master" "pkg"
-UPDATE_PACKAGE "kcptun-client" "lunatickochiya/luna-action-packages" "master" "pkg"
+# 独立包仓库，包名明确为 kcptun-client，避免从大杂烩仓库复制到错误目录。
+UPDATE_PACKAGE "kcptun-client" "permails/kcptun-client" "main" "pkg"
 UPDATE_PACKAGE "passwall" "Openwrt-Passwall/openwrt-passwall" "main" "pkg"
 UPDATE_PACKAGE "passwall2" "Openwrt-Passwall/openwrt-passwall2" "main" "pkg"
 
