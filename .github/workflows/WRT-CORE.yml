@@ -232,7 +232,7 @@ jobs:
             GEOIP_VER=$(sed -n 's/^GEOIP_VER:=//p' "$GEO_MAKE")
             GEOIP_HASH=$(sed -n '/^define Download\/geoip/,/^endef/ s/^  HASH:=//p' "$GEO_MAKE")
             GEOSITE_VER=$(sed -n 's/^GEOSITE_VER:=//p' "$GEO_MAKE")
-            GEOSITE_HASH=$(sed -n '/^define Download\/geosite/,/^endef/ s/^  HASH:=//p' "$GEO_MAKE")
+            GEOSITE_HASH=$(sed -n '/^define Download\/geosite$/,/^endef/ s/^  HASH:=//p' "$GEO_MAKE")
             GEOSITE_IRAN_VER=$(sed -n 's/^GEOSITE_IRAN_VER:=//p' "$GEO_MAKE")
             GEOSITE_IRAN_HASH=$(sed -n '/^define Download\/geosite-ir/,/^endef/ s/^  HASH:=//p' "$GEO_MAKE")
 
