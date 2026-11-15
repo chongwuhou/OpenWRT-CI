@@ -229,7 +229,21 @@ jobs:
             exit 1
           fi
 
-          if ! grep -q '^CONFIG_PACKAGE_sing-box=y
+          if ! grep -q '^CONFIG_PACKAGE_sing-box=y' .config; then
+            echo "sing-box-defconfig-missing"
+            grep -R "define Package/sing-box" ./package ./feeds 2>/dev/null | head -n 20 || true
+            exit 1
+          fi
+          for REQUIRED in mihomo naiveproxy xray-core v2ray-core hysteria tuic-client docker docker-compose dockerd luci-app-store; do
+            if ! grep -q "^CONFIG_PACKAGE_"$REQUIRED"=y" .config; then
+              echo "required-package-missing: "$REQUIRED""
+              exit 1
+            fi
+          done
+          echo "sing-box and required package selections: enabled"
+
+          make clean -j$(nproc)
+
       - name: Prepare Rust Toolchain
         if: ${{ !inputs.WRT_TEST }}
         run: |
