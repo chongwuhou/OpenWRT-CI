@@ -228,6 +228,9 @@ jobs:
             "luci-app-openclash:./package/luci-app-openclash/Makefile" \
             "luci-app-homeproxy:./package/luci-app-homeproxy/Makefile" \
             "luci-app-store:./package/luci-app-store/Makefile" \
+            "luci-lib-taskd:./package/luci-lib-taskd/Makefile" \
+            "luci-lib-xterm:./package/luci-lib-xterm/Makefile" \
+            "taskd:./package/taskd/Makefile" \
             "luci-app-dockerman:./package/luci-app-dockerman/Makefile" \
             "luci-lib-docker:./package/luci-lib-docker/Makefile" \
             "kcptun-client:./package/kcptun-client/Makefile"; do
