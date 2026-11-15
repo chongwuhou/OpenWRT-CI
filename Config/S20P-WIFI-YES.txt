@@ -264,3 +264,4 @@ CONFIG_DOCKER_STO_BTRFS=y
 # CI final preflight 2: workflow YAML repaired; validate sing-box source and defconfig before compile.
 # CI final preflight 3: remove orphaned YAML fragment and validate workflow before compile.
 # CI final preflight 4: retain one cache-rollover job after workflow repair.
+# CI final preflight 5: remove duplicate feeds/base sing-box source before defconfig.
