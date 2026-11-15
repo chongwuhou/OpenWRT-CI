@@ -268,3 +268,4 @@ CONFIG_DOCKER_STO_BTRFS=y
 # CI final preflight 6: explicitly delete feeds/base/sing-box duplicate.
 # CI final preflight 7: remove duplicate sing-box paths immediately before defconfig.
 # CI final preflight 8: explicit VIKING sing-box copy and exactly-one-source validation.
+# CI final preflight 9: canonical VIKING sing-box feed source.
