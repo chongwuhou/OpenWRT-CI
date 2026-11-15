@@ -204,8 +204,14 @@ jobs:
 
           make defconfig -j$(nproc)
 
-          if ! grep -q '^CONFIG_PACKAGE_sing-box=y
+          if ! grep -q '^CONFIG_PACKAGE_sing-box=y$' .config; then
+            echo "sing-box-defconfig-missing"
+            grep -R "define Package/sing-box" ./package ./feeds 2>/dev/null | head -n 20 || true
+            exit 1
+          fi
+          echo "sing-box defconfig: enabled"
 
+          make clean -j$(nproc)
       - name: Prepare Rust Toolchain
         if: ${{ !inputs.WRT_TEST }}
         run: |
