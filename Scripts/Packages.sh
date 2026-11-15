@@ -33,7 +33,7 @@ UPDATE_PACKAGE() {
 			echo "Not fonud directory: $NAME"
 		fi
 	if [ "$NAME" = "sing-box" ]; then
-		for DIR in ./feeds/base/sing-box ./feeds/base/feeds/packages/sing-box ./package/feeds/base/sing-box ./feeds/packages/net/sing-box ./package/feeds/packages/sing-box; do
+		for DIR in ./package/sing-box ./feeds/base/sing-box ./feeds/base/feeds/packages/sing-box ./package/feeds/base/sing-box ./feeds/packages/net/sing-box ./package/feeds/packages/sing-box; do
 			if [ -e "$DIR" ] || [ -L "$DIR" ]; then
 				rm -rf "$DIR"
 				echo "Delete duplicate sing-box: $DIR"
@@ -53,11 +53,10 @@ UPDATE_PACKAGE() {
 		for NAME in "${PKG_LIST[@]}"; do
 			# sing-box 不能依赖 find 的目录匹配：明确复制 VIKINGYFY 的完整包，避免 feed 冲突清理后包源消失。
 			if [ "$NAME" = "sing-box" ] && [ -f "$REPO_PATH/sing-box/Makefile" ]; then
-				# ImmortalWrt 当前已带一个 feeds/base/sing-box；直接覆盖它并只保留一个源，避免包扫描丢失。
+				# 直接放入 package/，这是 OpenWrt 主构建树会扫描的路径；不再放入 feeds/base。
 				rm -rf "./package/sing-box" "./feeds/base/sing-box"
-				mkdir -p "./feeds/base"
-				cp -rf "$REPO_PATH/sing-box" "./feeds/base/sing-box"
-				echo "Install VIKINGYFY sing-box: ./feeds/base/sing-box"
+				cp -rf "$REPO_PATH/sing-box" "./package/sing-box"
+				echo "Install VIKINGYFY sing-box: ./package/sing-box"
 			# 兼容“仓库根目录就是一个包”的独立仓库，也兼容多包大杂烩仓库。
 			elif [ -f "$REPO_PATH/Makefile" ] && grep -q "define Package/$NAME" "$REPO_PATH/Makefile"; then
 				# 独立仓库的根目录就是包本体，复制到 OpenWrt 的 package/ 目录。
@@ -96,8 +95,10 @@ UPDATE_PACKAGE "vantage" "anothaDev/luci-theme-vantage" "main"
 UPDATE_PACKAGE "momo" "nikkinikki-org/OpenWrt-momo" "main"
 UPDATE_PACKAGE "nikki" "nikkinikki-org/OpenWrt-nikki" "main"
 UPDATE_PACKAGE "openclash" "vernesong/OpenClash" "dev" "pkg"
-UPDATE_PACKAGE "luci-app-ssr-plus" "fw876/helloworld" "master" "pkg"
-UPDATE_PACKAGE "dns2socks-rust" "fw876/helloworld" "master" "pkg"
+UPDATE_PACKAGE "luci-app-ssr-plus" "fw876/helloworld" "v198.3" "pkg" "mihomo"
+UPDATE_PACKAGE "dns2socks-rust" "fw876/helloworld" "v198.3" "pkg"
+# NaiveProxy 使用 PassWall 官方配套仓库的 OpenWrt 预编译包，避免 Chromium 源码构建造成超长等待和架构兼容风险。
+UPDATE_PACKAGE "naiveproxy" "Openwrt-Passwall/openwrt-passwall-packages" "main" "pkg"
 # 独立包仓库，包名明确为 kcptun-client，避免从大杂烩仓库复制到错误目录。
 UPDATE_PACKAGE "kcptun-client" "permails/kcptun-client" "main" "pkg"
 UPDATE_PACKAGE "passwall" "Openwrt-Passwall/openwrt-passwall" "main" "pkg"
