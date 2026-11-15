@@ -51,8 +51,13 @@ UPDATE_PACKAGE() {
 	if [[ "$PKG_SPECIAL" == "pkg" ]]; then
 		# 主包和第5个参数列出的附属包都要复制，避免只得到 LuCI 界面而漏掉运行依赖。
 		for NAME in "${PKG_LIST[@]}"; do
+			# sing-box 不能依赖 find 的目录匹配：明确复制 VIKINGYFY 的完整包，避免 feed 冲突清理后包源消失。
+			if [ "$NAME" = "sing-box" ] && [ -f "$REPO_PATH/sing-box/Makefile" ]; then
+				rm -rf "./package/sing-box"
+				cp -rf "$REPO_PATH/sing-box" "./package/sing-box"
+				echo "Install VIKINGYFY sing-box: ./package/sing-box"
 			# 兼容“仓库根目录就是一个包”的独立仓库，也兼容多包大杂烩仓库。
-			if [ -f "$REPO_PATH/Makefile" ] && grep -q "define Package/$NAME" "$REPO_PATH/Makefile"; then
+			elif [ -f "$REPO_PATH/Makefile" ] && grep -q "define Package/$NAME" "$REPO_PATH/Makefile"; then
 				# 独立仓库的根目录就是包本体，复制到 OpenWrt 的 package/ 目录。
 				rm -rf "./package/$NAME"
 				cp -rf "$REPO_PATH" "./package/$NAME"
