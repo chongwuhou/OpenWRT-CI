@@ -19,7 +19,7 @@ UPDATE_PACKAGE() {
 		# 查找 feed 源目录以及 feeds install -a 留下的旧链接/目录。
 		# 同名旧链接会让自定义包（尤其是 sing-box）在 make defconfig 时被忽略。
 		echo "Search directory: $NAME"
-		local FOUND_DIRS=$(find ./feeds/luci/ ./feeds/packages/ ./package/feeds/luci/ ./package/feeds/packages/ \
+		local FOUND_DIRS=$(find ./feeds/base/ ./feeds/luci/ ./feeds/packages/ ./package/feeds/base/ ./package/feeds/luci/ ./package/feeds/packages/ \
 			-maxdepth 4 \( -type d -o -type l \) -iname "*$NAME*" 2>/dev/null)
 
 		# 删除找到的目录或链接
