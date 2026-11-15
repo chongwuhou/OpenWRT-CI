@@ -217,6 +217,29 @@ jobs:
             exit 1
           fi
 
+          # .config 中写成 y 不能证明包一定被 OpenWrt 注册；先逐项检查 Makefile 和 Package 定义。
+          for REQUIRED_SPEC in \
+            "sing-box:./package/sing-box/Makefile" \
+            "naiveproxy:./package/naiveproxy/Makefile" \
+            "mihomo:./package/mihomo/Makefile" \
+            "luci-app-passwall:./package/luci-app-passwall/Makefile" \
+            "luci-app-passwall2:./package/luci-app-passwall2/Makefile" \
+            "luci-app-ssr-plus:./package/luci-app-ssr-plus/Makefile" \
+            "luci-app-openclash:./package/luci-app-openclash/Makefile" \
+            "luci-app-homeproxy:./package/luci-app-homeproxy/Makefile" \
+            "luci-app-store:./package/luci-app-store/Makefile" \
+            "luci-app-dockerman:./package/luci-app-dockerman/Makefile" \
+            "luci-lib-docker:./package/luci-lib-docker/Makefile" \
+            "kcptun-client:./package/kcptun-client/Makefile"; do
+            NAME="${REQUIRED_SPEC%%:*}"
+            MAKEFILE="${REQUIRED_SPEC#*:}"
+            if [ ! -f "$MAKEFILE" ] || ! grep -q "define Package/$NAME" "$MAKEFILE"; then
+              echo "package-source-or-definition-missing: $NAME ($MAKEFILE)"
+              exit 1
+            fi
+          done
+          echo "critical package sources and definitions: present"
+
           DEFCONFIG_LOG="$GITHUB_WORKSPACE/defconfig.log"
           if ! make defconfig -j$(nproc) 2>&1 | tee "$DEFCONFIG_LOG"; then
             echo "defconfig-failed"
