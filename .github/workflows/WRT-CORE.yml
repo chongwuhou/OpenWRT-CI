@@ -399,14 +399,6 @@ jobs:
               gh cache delete "$CACHE_ID" --repo "$GH_REPO" ||
                 echo "warning: failed to delete cache $CACHE_ID ($CACHE_KEY)"
             done
- .config; then
-            echo "sing-box-defconfig-missing"
-            grep -R "define Package/sing-box" ./package ./feeds 2>/dev/null | head -n 20 || true
-            exit 1
-          fi
-          echo "sing-box defconfig: enabled"
-
-          make clean -j$(nproc)
 
       - name: Prepare Rust Toolchain
         if: ${{ !inputs.WRT_TEST }}
