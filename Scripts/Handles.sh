@@ -65,9 +65,9 @@ if [ -f "$SING_BOX_MAKE" ] && grep -q '^  GO_PKG_TAGS:=http2legacy,' "$SING_BOX_
 		"$SING_BOX_MAKE"
 	if ! grep -q 'TARGET_LDFLAGS += -lcronet' "$SING_BOX_MAKE"; then
 		# 以完整三行条件块插入，避免 sed 多次插入导致孤立 endif 使 Makefile 无法注册包。
-		FIX "sing-box-naive-link" "$SING_BOX_DIR" sed -i '/^define Package\/sing-box\/conffiles/i\\
-ifneq ($(findstring with_naive_outbound,$(GO_PKG_TAGS)),)\\
-  TARGET_LDFLAGS += -lcronet\\
+		FIX "sing-box-naive-link" "$SING_BOX_DIR" sed -i '/^define Package\/sing-box\/conffiles/i\
+ifneq ($(findstring with_naive_outbound,$(GO_PKG_TAGS)),)\
+  TARGET_LDFLAGS += -lcronet\
 endif' "$SING_BOX_MAKE"
 	fi
 	mkdir -p "$SING_BOX_DIR/patches"
