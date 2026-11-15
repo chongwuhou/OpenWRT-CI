@@ -47,34 +47,39 @@ FIX "natmapt" "$PACKAGE_PATH/luci-app-natmapt" sed -i "s/network/services/g" \
 
 # sing-box 完整版补齐 Naive outbound：VIKINGYFY 配套包默认未启用该构建标签。
 # 使用 ImmortalWrt 的系统 libcronet，避免依赖内置平台库；PassWall 才会显示 sing-box/Naive 协议。
-SING_BOX_MAKE="$PACKAGE_PATH/sing-box/Makefile"
+SING_BOX_DIR="$PACKAGE_PATH/sing-box"
+SING_BOX_MAKE="$SING_BOX_DIR/Makefile"
+if [ ! -f "$SING_BOX_MAKE" ] && [ -f "$FEEDS_PATH/base/sing-box/Makefile" ]; then
+	SING_BOX_DIR="$FEEDS_PATH/base/sing-box"
+	SING_BOX_MAKE="$SING_BOX_DIR/Makefile"
+fi
 if [ -f "$SING_BOX_MAKE" ] && grep -q '^  GO_PKG_TAGS:=http2legacy,' "$SING_BOX_MAKE" && ! grep -q 'with_naive_outbound' "$SING_BOX_MAKE"; then
-	FIX "sing-box-naive-dep" "$PACKAGE_PATH/sing-box" sed -i \
+	FIX "sing-box-naive-dep" "$SING_BOX_DIR" sed -i \
 		's|^  DEPENDS+= +kmod-netlink-diag +kmod-tun$|  DEPENDS+= +kmod-netlink-diag +kmod-tun +libcronet|' \
 		"$SING_BOX_MAKE"
-	FIX "sing-box-checklinkname" "$PACKAGE_PATH/sing-box" sed -i \
+	FIX "sing-box-checklinkname" "$SING_BOX_DIR" sed -i \
 		'/^GO_PKG_LDFLAGS_X:=/i GO_PKG_LDFLAGS:=-checklinkname=0' \
 		"$SING_BOX_MAKE"
-	FIX "sing-box-naive-tag" "$PACKAGE_PATH/sing-box" sed -i \
+	FIX "sing-box-naive-tag" "$SING_BOX_DIR" sed -i \
 		's|^  GO_PKG_TAGS:=http2legacy,with_acme,with_clash_api,with_dhcp,with_gvisor,with_quic,with_tailscale,with_utls,with_wireguard$|  GO_PKG_TAGS:=http2legacy,with_acme,with_clash_api,with_dhcp,with_gvisor,with_naive_outbound,with_quic,with_tailscale,with_utls,with_wireguard|' \
 		"$SING_BOX_MAKE"
 	if ! grep -q 'TARGET_LDFLAGS += -lcronet' "$SING_BOX_MAKE"; then
-		FIX "sing-box-naive-link" "$PACKAGE_PATH/sing-box" sed -i \
+		FIX "sing-box-naive-link" "$SING_BOX_DIR" sed -i \
 			-e '/^define Package\/sing-box\/conffiles/i\endif' \
 			-e '/^define Package\/sing-box\/conffiles/i\  TARGET_LDFLAGS += -lcronet' \
 			-e '/^define Package\/sing-box\/conffiles/i\ifneq ($(findstring with_naive_outbound,$(GO_PKG_TAGS)),)' \
 			"$SING_BOX_MAKE"
 	fi
-	mkdir -p "$PACKAGE_PATH/sing-box/patches"
-	if [ ! -f "$PACKAGE_PATH/sing-box/patches/100-use-system-libcronet.patch" ]; then
+	mkdir -p "$SING_BOX_DIR/patches"
+	if [ ! -f "$SING_BOX_DIR/patches/100-use-system-libcronet.patch" ]; then
 		printf '%s\n' \
 			'--- a/protocol/naive/outbound.go' \
 			'+++ b/protocol/naive/outbound.go' \
 			'@@ -9,7 +9,6 @@ import (' \
-			$'	"github.com/sagernet/cronet-go"' \
-			$'-	_ "github.com/sagernet/cronet-go/all"' \
-			$'	"github.com/sagernet/sing-box/adapter"' \
-			> "$PACKAGE_PATH/sing-box/patches/100-use-system-libcronet.patch"
+			$'\t"github.com/sagernet/cronet-go"' \
+			$'-\t_ "github.com/sagernet/cronet-go/all"' \
+			$'\t"github.com/sagernet/sing-box/adapter"' \
+			> "$SING_BOX_DIR/patches/100-use-system-libcronet.patch"
 	fi
 fi
 # OpenAppFilter：Linux 6.18 将 del_timer_sync() 更名为 timer_delete_sync()。
