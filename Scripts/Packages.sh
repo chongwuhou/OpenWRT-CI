@@ -53,9 +53,11 @@ UPDATE_PACKAGE() {
 		for NAME in "${PKG_LIST[@]}"; do
 			# sing-box 不能依赖 find 的目录匹配：明确复制 VIKINGYFY 的完整包，避免 feed 冲突清理后包源消失。
 			if [ "$NAME" = "sing-box" ] && [ -f "$REPO_PATH/sing-box/Makefile" ]; then
-				rm -rf "./package/sing-box"
-				cp -rf "$REPO_PATH/sing-box" "./package/sing-box"
-				echo "Install VIKINGYFY sing-box: ./package/sing-box"
+				# ImmortalWrt 当前已带一个 feeds/base/sing-box；直接覆盖它并只保留一个源，避免包扫描丢失。
+				rm -rf "./package/sing-box" "./feeds/base/sing-box"
+				mkdir -p "./feeds/base"
+				cp -rf "$REPO_PATH/sing-box" "./feeds/base/sing-box"
+				echo "Install VIKINGYFY sing-box: ./feeds/base/sing-box"
 			# 兼容“仓库根目录就是一个包”的独立仓库，也兼容多包大杂烩仓库。
 			elif [ -f "$REPO_PATH/Makefile" ] && grep -q "define Package/$NAME" "$REPO_PATH/Makefile"; then
 				# 独立仓库的根目录就是包本体，复制到 OpenWrt 的 package/ 目录。
