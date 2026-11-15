@@ -201,12 +201,15 @@ jobs:
             fi
           done
 
-          SING_BOX_SOURCE=$(find ./package -type f -path '*/sing-box/Makefile' -print -quit)
-          if [ -z "$SING_BOX_SOURCE" ]; then
-            echo "sing-box-source-missing"
-            find ./package -maxdepth 5 -type f -path '*/sing-box/Makefile' -print
+          SING_BOX_SOURCES=$(find ./package ./feeds -type f -path '*/sing-box/Makefile' -print 2>/dev/null | sort -u)
+          SING_BOX_COUNT=$(printf '%s\n' "$SING_BOX_SOURCES" | sed '/^$/d' | wc -l)
+          echo "sing-box sources ($SING_BOX_COUNT):"
+          printf '%s\n' "$SING_BOX_SOURCES"
+          if [ "$SING_BOX_COUNT" -ne 1 ]; then
+            echo "sing-box-source-count-invalid"
             exit 1
           fi
+          SING_BOX_SOURCE=$(printf '%s\n' "$SING_BOX_SOURCES" | sed -n '1p')
           echo "sing-box source: $SING_BOX_SOURCE"
 
           make defconfig -j$(nproc)
