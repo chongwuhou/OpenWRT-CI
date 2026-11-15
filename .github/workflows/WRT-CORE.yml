@@ -194,6 +194,13 @@ jobs:
           $GITHUB_WORKSPACE/Scripts/Settings.sh
           $GITHUB_WORKSPACE/.github/scripts/prepare-build-host.sh
 
+          for DIR in ./feeds/base/sing-box ./feeds/base/feeds/packages/sing-box ./package/feeds/base/sing-box ./feeds/packages/net/sing-box ./package/feeds/packages/sing-box; do
+            if [ -e "$DIR" ] || [ -L "$DIR" ]; then
+              rm -rf "$DIR"
+              echo "Delete duplicate sing-box before defconfig: $DIR"
+            fi
+          done
+
           SING_BOX_SOURCE=$(find ./package -type f -path '*/sing-box/Makefile' -print -quit)
           if [ -z "$SING_BOX_SOURCE" ]; then
             echo "sing-box-source-missing"
