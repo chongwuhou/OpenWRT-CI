@@ -262,3 +262,4 @@ CONFIG_DOCKER_STO_BTRFS=y
 # CI queue retry 2: verify package/feeds depth-four cleanup makes VIKINGYFY sing-box visible.
 # CI final preflight: verify clean sing-box package placement and defconfig visibility before long compile.
 # CI final preflight 2: workflow YAML repaired; validate sing-box source and defconfig before compile.
+# CI final preflight 3: remove orphaned YAML fragment and validate workflow before compile.
