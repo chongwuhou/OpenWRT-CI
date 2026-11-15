@@ -20,7 +20,7 @@ UPDATE_PACKAGE() {
 		# 同名旧链接会让自定义包（尤其是 sing-box）在 make defconfig 时被忽略。
 		echo "Search directory: $NAME"
 		local FOUND_DIRS=$(find ./feeds/luci/ ./feeds/packages/ ./package/feeds/luci/ ./package/feeds/packages/ \
-			-maxdepth 3 \( -type d -o -type l \) -iname "*$NAME*" 2>/dev/null)
+			-maxdepth 4 \( -type d -o -type l \) -iname "*$NAME*" 2>/dev/null)
 
 		# 删除找到的目录或链接
 		if [ -n "$FOUND_DIRS" ]; then
@@ -177,3 +177,5 @@ if [ -f "$GITHUB_WORKSPACE/Scripts/PRIVATE.sh" ]; then
 	source "$GITHUB_WORKSPACE/Scripts/PRIVATE.sh"
 fi
 
+
+# CI queue retry 2: remove stale package/feeds links at depth four before custom package copy.
