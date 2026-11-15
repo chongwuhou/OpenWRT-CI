@@ -259,3 +259,4 @@ CONFIG_DOCKER_STO_BTRFS=y
 # CI final retry 4: remove stale feed links so VIKINGYFY sing-box is visible to defconfig.
 # CI final retry 4: use concrete nftables/ip6tables package variants.
 # CI queue retry: trigger a fresh S20P run without changing package selection.
+# CI queue retry 2: verify package/feeds depth-four cleanup makes VIKINGYFY sing-box visible.
