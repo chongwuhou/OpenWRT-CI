@@ -194,7 +194,213 @@ jobs:
           $GITHUB_WORKSPACE/Scripts/Settings.sh
           $GITHUB_WORKSPACE/.github/scripts/prepare-build-host.sh
 
-          make defconfig -j$(nproc) && make clean -j$(nproc)
+          SING_BOX_SOURCE=$(find ./package -type f -path '*/sing-box/Makefile' -print -quit)
+          if [ -z "$SING_BOX_SOURCE" ]; then
+            echo "sing-box-source-missing"
+            find ./package -maxdepth 5 -type f -path '*/sing-box/Makefile' -print
+            exit 1
+          fi
+          echo "sing-box source: $SING_BOX_SOURCE"
+
+          make defconfig -j$(nproc)
+
+          if ! grep -q '^CONFIG_PACKAGE_sing-box=y
+
+      - name: Prepare Rust Toolchain
+        if: ${{ !inputs.WRT_TEST }}
+        run: |
+          cd ./wrt/
+
+          $GITHUB_WORKSPACE/.github/scripts/prepare-rust.sh
+
+      - name: Download Packages
+        if: ${{ !inputs.WRT_TEST }}
+        run: |
+          cd ./wrt/
+
+          make download -j$(nproc)
+
+          # v2ray-geodata 在 Build/Prepare 中按需下载，make download 不会提前取这些数据文件。
+          # 先用可重试的 curl 下载并校验，避免并行编译时大文件下载卡住到最后才失败。
+          GEO_MAKE="feeds/packages/net/v2ray-geodata/Makefile"
+          if [ -f "$GEO_MAKE" ]; then
+            download_geo() {
+              local package="$1"
+              local version="$2"
+              local file="$3"
+              local hash="$4"
+              local url="$5"
+              if grep -q "^CONFIG_PACKAGE_$package=y" .config; then
+                if [ ! -f "dl/$file" ]; then
+                  curl --fail --location --retry 5 --retry-delay 3 --retry-all-errors \
+                    "$url" -o "dl/$file"
+                fi
+                echo "$hash  dl/$file" | sha256sum -c -
+              fi
+            }
+
+            GEOIP_VER=$(sed -n 's/^GEOIP_VER:=//p' "$GEO_MAKE")
+            GEOIP_HASH=$(sed -n '/^define Download\/geoip/,/^endef/ s/^  HASH:=//p' "$GEO_MAKE")
+            GEOSITE_VER=$(sed -n 's/^GEOSITE_VER:=//p' "$GEO_MAKE")
+            GEOSITE_HASH=$(sed -n '/^define Download\/geosite$/,/^endef/ s/^  HASH:=//p' "$GEO_MAKE")
+            GEOSITE_IRAN_VER=$(sed -n 's/^GEOSITE_IRAN_VER:=//p' "$GEO_MAKE")
+            GEOSITE_IRAN_HASH=$(sed -n '/^define Download\/geosite-ir/,/^endef/ s/^  HASH:=//p' "$GEO_MAKE")
+
+            download_geo "v2ray-geoip" "$GEOIP_VER" "geoip.dat.$GEOIP_VER" "$GEOIP_HASH" \
+              "https://github.com/v2fly/geoip/releases/download/$GEOIP_VER/geoip.dat"
+            download_geo "v2ray-geosite" "$GEOSITE_VER" "dlc.dat.$GEOSITE_VER" "$GEOSITE_HASH" \
+              "https://github.com/v2fly/domain-list-community/releases/download/$GEOSITE_VER/dlc.dat"
+            download_geo "v2ray-geosite-ir" "$GEOSITE_IRAN_VER" "iran.dat.$GEOSITE_IRAN_VER" "$GEOSITE_IRAN_HASH" \
+              "https://github.com/bootmortis/iran-hosted-domains/releases/download/$GEOSITE_IRAN_VER/iran.dat"
+          fi
+
+      - name: Compile Firmware
+        if: ${{ !inputs.WRT_TEST }}
+        run: |
+          cd ./wrt/
+
+          mkdir -p $GITHUB_WORKSPACE/build-reports
+          make -j$(nproc) BUILD_TIME_LOG="$GITHUB_WORKSPACE/build-reports/parallel.tsv" || \
+            make -j1 V=s BUILD_TIME_LOG="$GITHUB_WORKSPACE/build-reports/serial.tsv"
+
+      - name: Collect Build Reports
+        if: ${{ !inputs.WRT_TEST && always() }}
+        continue-on-error: true
+        run: |
+          cd ./wrt/
+
+          $GITHUB_WORKSPACE/.github/scripts/collect-build-reports.sh
+
+      - name: Upload Build Reports
+        if: ${{ !inputs.WRT_TEST && always() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-reports-${{env.WRT_CONFIG}}-${{env.WRT_INFO}}-${{github.run_attempt}}
+          path: ./build-reports/
+          retention-days: 7
+
+      - name: Save Build Cache
+        if: ${{ !inputs.WRT_TEST && success() && steps.cache-restore.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@main
+        with:
+          key: ${{env.WRT_CACHE_KEY}}
+          path: |
+            ./wrt/.ccache
+            ./wrt/staging_dir/host*
+            ./wrt/staging_dir/tool*
+
+      - name: Machine Information
+        run: |
+          cd ./wrt/
+
+          echo "======================="
+          lscpu | grep -E "name|Core|Thread"
+          echo "======================="
+          df -h
+          echo "======================="
+          du -h --max-depth=1
+          echo "======================="
+
+      - name: Package Firmware
+        run: |
+          cd ./wrt/ && mkdir ./upload/
+
+          cp -f ./.config ./upload/Config-"$WRT_CONFIG"-"$WRT_INFO"-"$WRT_BRANCH"-"$WRT_DATE".txt
+
+          if [[ "$WRT_TEST" != 'true' ]]; then
+            echo "WRT_KVER=$(find ./bin/targets/ -type f -name "*.manifest" -exec grep -oP '^kernel - \K[\d\.]+' {} \;)" >> $GITHUB_ENV
+            echo "WRT_LIST=$(find ./bin/targets/ -type f -name "*.manifest" -exec grep -oP '^luci-(app|theme)[^ ]*' {} \; | tr '\n' ' ')" >> $GITHUB_ENV
+
+            find ./bin/targets/ -iregex ".*\(buildinfo\|json\|sha256sums\|packages\)$" -exec rm -rf {} +
+
+            for FILE in $(find ./bin/targets/ -type f -iname "*$WRT_TARGET*") ; do
+              EXT=$(basename $FILE | cut -d '.' -f 2-)
+              NAME=$(basename $FILE | cut -d '.' -f 1 | grep -io "\($WRT_TARGET\).*")
+              NEW_FILE="$NAME"-"$WRT_INFO"-"$WRT_BRANCH"-"$WRT_WIFI"-"$WRT_DATE"."$EXT"
+              mv -f $FILE ./upload/$NEW_FILE
+            done
+
+            find ./bin/targets/ -type f -exec mv -f {} ./upload/ \;
+
+            make clean -j$(nproc)
+          fi
+
+      - name: Release Firmware
+        uses: softprops/action-gh-release@master
+        with:
+          tag_name: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}-${{env.WRT_BRANCH}}-${{env.WRT_DATE}}
+          files: ./wrt/upload/*.*
+          body: |
+            这是个平台固件包，内含多个设备！
+            请注意选择你需要的设备固件！
+            不要问，刷就完事了！
+
+            全系带开源硬件加速，别问了！
+
+            源码：${{env.WRT_REPO}}
+            分支：${{env.WRT_BRANCH}}
+            提交：${{env.WRT_HASH}}
+
+            配置：${{env.WRT_CONFIG}}
+            平台：${{env.WRT_TARGET}}
+
+            登录地址：${{env.WRT_IP}}
+            登录密码：${{env.WRT_PW}}
+
+            WIFI名称：${{env.WRT_SSID}}
+            WIFI密码：${{env.WRT_WORD}}
+
+            内核版本：${{env.WRT_KVER}}
+            插件列表：${{env.WRT_LIST}}
+
+  cache-rollover:
+    name: Roll cache generations
+    needs: core
+    if: ${{ !inputs.WRT_TEST && needs.core.result == 'success' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: wrt-cache-rollover-${{github.ref}}-${{needs.core.outputs.cache_prefix}}
+      cancel-in-progress: false
+    env:
+      GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      GH_REPO: ${{github.repository}}
+      WRT_CACHE_PREFIX: ${{needs.core.outputs.cache_prefix}}
+      WRT_CACHE_KEY: ${{needs.core.outputs.cache_key}}
+    steps:
+      - name: Roll Build Cache
+        run: |
+          set -euo pipefail
+
+          CURRENT_CACHE_KEYS=$(gh cache list --repo "$GH_REPO" --key "$WRT_CACHE_KEY" --ref "$GITHUB_REF" --limit 100 --json key --jq '.[].key')
+          CURRENT_CACHE_FOUND=0
+          while IFS= read -r CACHE_KEY; do
+            if [ "$CACHE_KEY" = "$WRT_CACHE_KEY" ]; then
+              CURRENT_CACHE_FOUND=1
+              break
+            fi
+          done <<< "$CURRENT_CACHE_KEYS"
+
+          if [ "$CURRENT_CACHE_FOUND" -ne 1 ]; then
+            echo "skip cache rollover: current cache is not available yet"
+            exit 0
+          fi
+
+          gh cache list --repo "$GH_REPO" --key "$WRT_CACHE_PREFIX-" --ref "$GITHUB_REF" --limit 100 --json id,key --jq '.[] | [.id, .key] | @tsv' |
+            while IFS=$'\t' read -r CACHE_ID CACHE_KEY; do
+              [ -n "$CACHE_ID" ] || continue
+              [ "$CACHE_KEY" = "$WRT_CACHE_KEY" ] && continue
+              gh cache delete "$CACHE_ID" --repo "$GH_REPO" ||
+                echo "warning: failed to delete cache $CACHE_ID ($CACHE_KEY)"
+            done
+ .config; then
+            echo "sing-box-defconfig-missing"
+            grep -R "define Package/sing-box" ./package ./feeds 2>/dev/null | head -n 20 || true
+            exit 1
+          fi
+          echo "sing-box defconfig: enabled"
+
+          make clean -j$(nproc)
 
       - name: Prepare Rust Toolchain
         if: ${{ !inputs.WRT_TEST }}
