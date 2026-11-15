@@ -32,6 +32,14 @@ UPDATE_PACKAGE() {
 		else
 			echo "Not fonud directory: $NAME"
 		fi
+	if [ "$NAME" = "sing-box" ]; then
+		for DIR in ./feeds/base/sing-box ./feeds/base/feeds/packages/sing-box ./package/feeds/base/sing-box ./feeds/packages/net/sing-box ./package/feeds/packages/sing-box; do
+			if [ -e "$DIR" ] || [ -L "$DIR" ]; then
+				rm -rf "$DIR"
+				echo "Delete duplicate sing-box: $DIR"
+			fi
+		done
+	fi
 	done
 
 	# 克隆 GitHub 仓库
