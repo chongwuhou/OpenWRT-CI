@@ -49,6 +49,8 @@ UPDATE_PACKAGE() {
 				rm -rf "./package/$NAME"
 				cp -rf "$REPO_PATH" "./package/$NAME"
 			else
+				# 先删除同名目标，避免 cp 将包复制成 package/<name>/<name> 或落入旧链接。
+				rm -rf "./package/$NAME"
 				find "$REPO_PATH" -mindepth 1 -maxdepth 4 -type d -iname "*$NAME*" -prune -exec cp -rf {} ./package \;
 			fi
 		done
