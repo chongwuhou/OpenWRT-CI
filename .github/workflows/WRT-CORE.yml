@@ -278,7 +278,8 @@ jobs:
               exit 1
             fi
             # 标准包使用 define Package/...；LuCI 官方包也可能使用 LUCI_TITLE + PKG_NAME，并由 luci.mk 注册。
-            if ! grep -Eq '^define Package/($(PKG_NAME)|'"$NAME"')' "$MAKEFILE" \
+            if ! grep -Eq "^define Package/$NAME([/:]|$)" "$MAKEFILE" \
+              && ! grep -Eq '^define Package/\$\(PKG_NAME\)' "$MAKEFILE" \
               && ! grep -q '^LUCI_TITLE:=' "$MAKEFILE"; then
               echo "package-definition-missing: $NAME ($MAKEFILE)"
               exit 1
