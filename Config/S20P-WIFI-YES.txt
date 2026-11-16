@@ -290,3 +290,5 @@ CONFIG_DOCKER_STO_BTRFS=y
 # include SSR Plus+ official shadowsocksr-libev packages
 # CI preflight: selected-package APK metadata audit
 # CI preflight: critical package compile gate
+
+# CI preflight: all selected package compile and install
