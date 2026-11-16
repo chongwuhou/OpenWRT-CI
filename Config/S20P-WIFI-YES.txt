@@ -280,3 +280,4 @@ CONFIG_DOCKER_STO_BTRFS=y
 # CI final preflight 9: canonical VIKING sing-box feed source.
 # CI final preflight 10: valid Naive libcronet conditional block.
 # ci: normalize luci-lib-docker APK version
+# ci: rebuild after reusable workflow yaml repair
