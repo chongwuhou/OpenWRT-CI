@@ -20,7 +20,8 @@ on:
         required: false
         type: boolean
 
-permissions: write-all
+permissions:
+  contents: write
 
 jobs:
   config:

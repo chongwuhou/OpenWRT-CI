@@ -69,7 +69,7 @@ jobs:
       cache_key: ${{steps.clone-code.outputs.cache_key}}
     steps:
       - name: Checkout Projects
-        uses: actions/checkout@main
+        uses: actions/checkout@v4
 
       - name: Initialization Environment
         env:
@@ -146,7 +146,7 @@ jobs:
       - name: Restore Build Cache
         id: cache-restore
         if: ${{ !inputs.WRT_TEST }}
-        uses: actions/cache/restore@main
+        uses: actions/cache/restore@v4
         with:
           key: ${{env.WRT_CACHE_KEY}}
           restore-keys: ${{env.WRT_CACHE_PREFIX}}-
@@ -194,66 +194,18 @@ jobs:
           $GITHUB_WORKSPACE/Scripts/Settings.sh
           $GITHUB_WORKSPACE/.github/scripts/prepare-build-host.sh
 
-          # Packages.sh 优先把 VIKINGYFY/sing-box 放入 package/sing-box；只清理 package/feeds 安装链接，保留 feeds 源避免链接别名误删主包。
+          # Packages.sh 已将 VIKINGYFY/packages 的 sing-box 作为唯一主包放入 package/sing-box。
+          # 这里仅验证唯一规范入口，不再在 defconfig 前复制、提升、删除源码，避免误伤 feeds/base 链接。
           SING_BOX_MAIN="./package/sing-box"
-          SING_BOX_STAGE="./tmp/sing-box-main"
-          rm -rf "$SING_BOX_STAGE"
-          SING_BOX_SOURCE_DIR=""
-          if [ -f "$SING_BOX_MAIN/Makefile" ]; then
-            SING_BOX_SOURCE_DIR="$SING_BOX_MAIN"
-          else
-            for CANDIDATE in \
-              ./feeds/base/sing-box \
-              ./feeds/base/feeds/packages/sing-box \
-              ./feeds/packages/net/sing-box \
-              ./package/feeds/base/sing-box \
-              ./package/feeds/packages/sing-box; do
-              if [ -f "$CANDIDATE/Makefile" ]; then
-                SING_BOX_SOURCE_DIR="$CANDIDATE"
-                break
-              fi
-            done
-          fi
-          if [ -z "$SING_BOX_SOURCE_DIR" ]; then
-            echo "sing-box-source-not-found"
+          if [ ! -f "$SING_BOX_MAIN/Makefile" ]; then
+            echo "sing-box-source-not-found: $SING_BOX_MAIN/Makefile"
             exit 1
           fi
-
-          # -aL 强制复制真实文件内容；随后 package/sing-box 一定是实体目录。
-          mkdir -p ./tmp
-          cp -aL "$SING_BOX_SOURCE_DIR" "$SING_BOX_STAGE"
-          rm -rf "$SING_BOX_MAIN"
-          cp -a "$SING_BOX_STAGE" "$SING_BOX_MAIN"
-          rm -rf "$SING_BOX_STAGE"
-          test -f "$SING_BOX_MAIN/Makefile"
-          echo "sing-box main source: $SING_BOX_SOURCE_DIR -> $SING_BOX_MAIN"
-
-          # 只移除 package/feeds 下的安装链接或副本；feeds/base 与 feeds/packages 是源仓库目录，不能递归删除。
-          for DIR in \
-            ./package/feeds/base/sing-box \
-            ./package/feeds/packages/sing-box \
-            ./package/feeds/luci/sing-box; do
-            if [ -L "$DIR" ]; then
-              unlink "$DIR"
-              echo "Unlink duplicate sing-box feed link: $DIR"
-            elif [ -d "$DIR" ]; then
-              rm -rf "$DIR"
-              echo "Delete duplicate sing-box package link: $DIR"
-            fi
-          done
-
-          # 直接验证实体主包，并检查 package/feeds 中没有残留安装源。
           if [ "$(find -L "$SING_BOX_MAIN" -maxdepth 1 -type f -name Makefile -print | wc -l)" -ne 1 ]; then
             echo "sing-box-main-makefile-invalid"
             exit 1
           fi
-          EXTRA_SING_BOX_SOURCES=$(find -L ./package/feeds -type f -path '*/sing-box/Makefile' -print 2>/dev/null | sort -u)
-          if [ -n "$EXTRA_SING_BOX_SOURCES" ]; then
-            echo "sing-box-duplicate-package-sources:"
-            printf '%s\n' "$EXTRA_SING_BOX_SOURCES"
-            exit 1
-          fi
-          echo "sing-box source: $SING_BOX_MAIN/Makefile"
+          echo "sing-box canonical source: $SING_BOX_MAIN/Makefile"
           # .config 中写成 y 不能证明包一定被 OpenWrt 注册；先逐项检查 Makefile 和 Package 定义。
           for REQUIRED_SPEC in \
             "sing-box:./package/sing-box/Makefile" \
@@ -322,8 +274,6 @@ jobs:
             fi
           done
           echo "sing-box and required package selections: enabled"
-
-          make clean -j$(nproc)
 
       - name: Preflight Package Metadata
         if: ${{ !inputs.WRT_TEST }}
@@ -426,14 +376,18 @@ jobs:
           set -o pipefail
           mkdir -p "$GITHUB_WORKSPACE/build-reports"
 
-          # 使用 OpenWrt 官方依赖链的内部 stamp，而不是直接调用 package/compile。
-          # package/stamp-compile 会先拉起 tools -> toolchain -> target，再编译全部已选软件包。
-          # 直接调用 package/compile 会跳过主机工具准备，导致 lua [host] 找不到 staging_dir/host/bin/sed。
-          make package/stamp-compile -j1 V=s 2>&1 | tee "$GITHUB_WORKSPACE/build-reports/preflight-package-compile.log"
-
-          # 官方 package/stamp-install 继续沿用 package/stamp-compile 的依赖闭包，
-          # 提前检查所有已选包的安装、APK 索引、依赖闭包和 rootfs 安装阶段。
-          make package/stamp-install -j1 V=s 2>&1 | tee "$GITHUB_WORKSPACE/build-reports/preflight-package-install.log"
+          # 只使用 OpenWrt 的公开构建目标，按 tools -> toolchain -> target -> package 顺序建立依赖链。
+          # package/stamp-* 是内部变量/标记，不是可直接调用的 make 目标。
+          run_make() {
+            local NAME="$1"
+            shift
+            make "$@" -j1 V=s 2>&1 | tee "$GITHUB_WORKSPACE/build-reports/preflight-$NAME.log"
+          }
+          run_make tools-compile tools/compile
+          run_make toolchain-compile toolchain/compile
+          run_make target-compile target/compile
+          run_make package-compile package/compile
+          run_make package-install package/install
 
       - name: Compile Firmware
         if: ${{ !inputs.WRT_TEST }}
@@ -443,6 +397,32 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/build-reports
           make -j$(nproc) BUILD_TIME_LOG="$GITHUB_WORKSPACE/build-reports/parallel.tsv" || \
             make -j1 V=s BUILD_TIME_LOG="$GITHUB_WORKSPACE/build-reports/serial.tsv"
+
+      - name: Audit Built Firmware
+        if: ${{ !inputs.WRT_TEST && success() }}
+        run: |
+          cd ./wrt/
+          MANIFEST=$(find ./bin/targets -type f -name '*.manifest' -print -quit)
+          if [ -z "$MANIFEST" ]; then
+            echo "firmware-manifest-missing"
+            exit 1
+          fi
+          for REQUIRED in \
+            luci-app-passwall luci-app-passwall2 luci-app-ssr-plus luci-app-openclash \
+            luci-app-store luci-app-homeproxy luci-lib-docker luci-app-dockerman \
+            docker docker-compose dockerd sing-box mihomo xray-core v2ray-core \
+            hysteria naiveproxy tuic-client tuic-server trojan; do
+            if ! grep -Eq "^${REQUIRED}([[:space:]]|$)" "$MANIFEST"; then
+              echo "firmware-manifest-missing-package: $REQUIRED"
+              exit 1
+            fi
+          done
+          SYSUPGRADE=$(find ./bin/targets -type f -iname '*sysupgrade*.bin' -print -quit)
+          if [ -z "$SYSUPGRADE" ]; then
+            echo "sysupgrade-image-missing"
+            exit 1
+          fi
+          echo "firmware audit passed: $SYSUPGRADE"
 
       - name: Collect Build Reports
         if: ${{ !inputs.WRT_TEST && always() }}
@@ -463,7 +443,7 @@ jobs:
 
       - name: Save Build Cache
         if: ${{ !inputs.WRT_TEST && success() && steps.cache-restore.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@main
+        uses: actions/cache/save@v4
         with:
           key: ${{env.WRT_CACHE_KEY}}
           path: |
@@ -504,11 +484,10 @@ jobs:
 
             find ./bin/targets/ -type f -exec mv -f {} ./upload/ \;
 
-            make clean -j$(nproc)
           fi
 
       - name: Release Firmware
-        uses: softprops/action-gh-release@master
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}-${{env.WRT_BRANCH}}-${{env.WRT_DATE}}
           files: ./wrt/upload/*.*

@@ -145,23 +145,15 @@ CONFIG_PACKAGE_luci-app-ssr-plus=y
 CONFIG_PACKAGE_luci-app-ssr-plus_Nftables_Transparent_Proxy=y
 CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_Xray=y
 CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_ChinaDNS_NG=y
-CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_DNS2SOCKS=y
-CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_DNS2SOCKS_RUST=y
 CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_DNS2TCP=y
-CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_DNSPROXY=y
 CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_MosDNS=y
-CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_Hysteria=y
-CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_Tuic_Client=y
 CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_Shadow_TLS=y
-CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_IPT2Socks=y
 CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_Kcptun=y
 CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_NaiveProxy=y
-CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_Redsocks2=y
 CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_Shadowsocks_Rust_Client=y
 CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_Shadowsocks_Rust_Server=y
 CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_Shadowsocks_Simple_Obfs=y
 CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_Shadowsocks_V2ray_Plugin=y
-CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_Trojan=y
 
 # 代理核心直接编译进固件，不依赖首次启动时在线下载
 CONFIG_PACKAGE_xray-core=y
@@ -207,7 +199,6 @@ CONFIG_PACKAGE_nping=y
 # Mihomo 由 fw876/helloworld v198.3 提供，适配 aarch64_cortex-a53。
 CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_Mihomo=y
 CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_Http_Proxy=y
-CONFIG_PACKAGE_luci-app-ssr-plus_INCLUDE_GeoData=y
 CONFIG_PACKAGE_mihomo=y
 CONFIG_PACKAGE_3proxy=y
 
@@ -257,41 +248,3 @@ CONFIG_DOCKER_NET_MACVLAN=y
 CONFIG_DOCKER_NET_TFTP=y
 CONFIG_DOCKER_STO_EXT4=y
 CONFIG_DOCKER_STO_BTRFS=y
-# CI probe: trigger one authorized cloud build; no package selection change.
-# CI probe 2: verify OpenAppFilter Linux 6.18 compatibility fix.
-# CI probe 3: verify recursive OpenAppFilter Linux 6.18 patch.
-# CI probe 4: verify timer_delete_sync compatibility for OpenAppFilter on Linux 6.18.
-# CI final build: verify S20P target, package precedence, native sing-box Naive/libcronet, and pre-fetched geodata.
-# CI final retry: validate cleaned Handles.sh and complete the S20P build.
-# CI final retry 2: verify isolated GeoSite checksum parsing before compile.
-# CI final retry 3: bypass v2ray-geodata network prepare after verified prefetch.
-# CI final retry 4: remove stale feed links so VIKINGYFY sing-box is visible to defconfig.
-# CI final retry 4: use concrete nftables/ip6tables package variants.
-# CI queue retry: trigger a fresh S20P run without changing package selection.
-# CI queue retry 2: verify package/feeds depth-four cleanup makes VIKINGYFY sing-box visible.
-# CI final preflight: verify clean sing-box package placement and defconfig visibility before long compile.
-# CI final preflight 2: workflow YAML repaired; validate sing-box source and defconfig before compile.
-# CI final preflight 3: remove orphaned YAML fragment and validate workflow before compile.
-# CI final preflight 4: retain one cache-rollover job after workflow repair.
-# CI final preflight 5: remove duplicate feeds/base sing-box source before defconfig.
-# CI final preflight 6: explicitly delete feeds/base/sing-box duplicate.
-# CI final preflight 7: remove duplicate sing-box paths immediately before defconfig.
-# CI final preflight 8: explicit VIKING sing-box copy and exactly-one-source validation.
-# CI final preflight 9: canonical VIKING sing-box feed source.
-# CI final preflight 10: valid Naive libcronet conditional block.
-# ci: normalize luci-lib-docker APK version
-# ci: rebuild after reusable workflow yaml repair
-# ci: rerun after sing-box source promotion fix
-# sing-box source canonicalization retry
-# preserve feed sources during sing-box cleanup
-# install PassWall using official luci-app directory names
-# accept variable-based package definitions from official OpenClash
-# remove obsolete netspeedtest python3-pkg-resources dependency
-# include SSR Plus+ official shadowsocksr-libev packages
-# CI preflight: selected-package APK metadata audit
-# CI preflight: critical package compile gate
-
-# CI preflight: all selected package compile and install
-# CI preflight: allow make-expanded package versions
-# CI preflight: official OpenWrt dependency stamps
-# CI preflight: confirmed supergateway_s20p is CLX S20P
