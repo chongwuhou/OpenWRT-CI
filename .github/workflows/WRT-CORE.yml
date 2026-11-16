@@ -426,12 +426,14 @@ jobs:
           set -o pipefail
           mkdir -p "$GITHUB_WORKSPACE/build-reports"
 
-          # 把所有 .config 选中的软件包逐个编译，先暴露真实的包级错误，再进入固件编译。
-          # -j1 保留完整、可定位的 V=s 原文；失败会立即停止，不再等数小时到总编译末尾才发现。
-          make package/compile -j1 V=s 2>&1 | tee "$GITHUB_WORKSPACE/build-reports/preflight-package-compile.log"
+          # 使用 OpenWrt 官方依赖链的内部 stamp，而不是直接调用 package/compile。
+          # package/stamp-compile 会先拉起 tools -> toolchain -> target，再编译全部已选软件包。
+          # 直接调用 package/compile 会跳过主机工具准备，导致 lua [host] 找不到 staging_dir/host/bin/sed。
+          make package/stamp-compile -j1 V=s 2>&1 | tee "$GITHUB_WORKSPACE/build-reports/preflight-package-compile.log"
 
-          # 再逐个安装到 staging/rootfs，提前检查文件冲突、依赖闭包和安装阶段错误。
-          make package/install -j1 V=s 2>&1 | tee "$GITHUB_WORKSPACE/build-reports/preflight-package-install.log"
+          # 官方 package/stamp-install 继续沿用 package/stamp-compile 的依赖闭包，
+          # 提前检查所有已选包的安装、APK 索引、依赖闭包和 rootfs 安装阶段。
+          make package/stamp-install -j1 V=s 2>&1 | tee "$GITHUB_WORKSPACE/build-reports/preflight-package-install.log"
 
       - name: Compile Firmware
         if: ${{ !inputs.WRT_TEST }}
