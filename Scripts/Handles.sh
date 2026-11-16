@@ -97,6 +97,13 @@ while IFS= read -r OAF_SRC; do
 	fi
 done < <(find "$PACKAGE_PATH" -type f -name 'app_filter.c' 2>/dev/null)
 
+# netspeedtest：当前 ImmortalWrt Python feed 已移除 python3-pkg-resources，且插件源码未使用 pkg_resources。
+NETSPEED_MAKE="$PACKAGE_PATH/netspeedtest/luci-app-netspeedtest/Makefile"
+if [ -f "$NETSPEED_MAKE" ] && grep -q 'python3-pkg-resources' "$NETSPEED_MAKE"; then
+	FIX "netspeedtest-stale-python-dep" "$PACKAGE_PATH/netspeedtest/luci-app-netspeedtest" sed -i 		's/[[:space:]]*+python3-pkg-resources//g' 		"$NETSPEED_MAKE"
+fi
+
+
 # v2ray-geodata：Download 宏在多个子包并行 Prepare 时仍可能重复触发网络下载。
 # Download Packages 阶段已完成强校验预取，这里只消费本地缓存，避免编译阶段再次访问 GitHub。
 GEO_MAKE="$FEEDS_PATH/packages/net/v2ray-geodata/Makefile"
