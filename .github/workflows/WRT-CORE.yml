@@ -325,6 +325,37 @@ jobs:
 
           make clean -j$(nproc)
 
+      - name: Preflight Package Metadata
+        if: ${{ !inputs.WRT_TEST }}
+        run: |
+          cd ./wrt/
+
+          # 先拦截 APK 无法接受的版本号，避免完整编译数小时后才在打包阶段失败。
+          # 当前最常见的来源是第三方 LuCI 包把 Git 标签的 v 前缀直接写进 PKG_VERSION。
+          INVALID_APK_VERSIONS=0
+          while IFS= read -r MAKEFILE; do
+            [ -f "$MAKEFILE" ] || continue
+            PKG_NAME=$(sed -n 's/^PKG_NAME:=//p' "$MAKEFILE" | head -n 1)
+            [ -n "$PKG_NAME" ] || continue
+            if grep -q "^CONFIG_PACKAGE_$PKG_NAME=y" .config && grep -Eq '^PKG_VERSION:=[vV]' "$MAKEFILE"; then
+              echo "invalid-selected-apk-version: $PKG_NAME ($MAKEFILE): $(grep -m1 '^PKG_VERSION:=' "$MAKEFILE")"
+              INVALID_APK_VERSIONS=1
+            fi
+          done < <(find -L ./package ./feeds -type f -name Makefile -print 2>/dev/null | sort -u)
+          if [ "$INVALID_APK_VERSIONS" -ne 0 ]; then
+            echo "preflight-package-version-audit-failed"
+            exit 1
+          fi
+
+          # 关键包必须仍然由实体 Makefile 提供，且配置没有被 defconfig 清掉。
+          for REQUIRED in sing-box mihomo naiveproxy xray-core v2ray-core hysteria tuic-client tuic-server docker docker-compose dockerd luci-lib-docker luci-app-dockerman luci-app-store; do
+            if ! grep -q "^CONFIG_PACKAGE_$REQUIRED=y" .config; then
+              echo "preflight-required-package-missing: $REQUIRED"
+              exit 1
+            fi
+          done
+          echo "preflight-package-metadata-audit: passed"
+
       - name: Prepare Rust Toolchain
         if: ${{ !inputs.WRT_TEST }}
         run: |
