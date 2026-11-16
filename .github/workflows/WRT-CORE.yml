@@ -410,13 +410,19 @@ jobs:
               "https://github.com/bootmortis/iran-hosted-domains/releases/download/$GEOSITE_IRAN_VER/iran.dat"
           fi
 
-      - name: Preflight Critical Package Compile
+      - name: Preflight All Selected Packages
         if: ${{ !inputs.WRT_TEST }}
         run: |
           cd ./wrt/
+          set -o pipefail
+          mkdir -p "$GITHUB_WORKSPACE/build-reports"
 
-          # 先顺序编译最容易在总编译末尾暴露问题的关键包；失败时保留完整 V=s 原文。
-          make package/npc/compile package/nps/compile package/mihomo/compile package/luci-lib-docker/compile package/luci-app-dockerman/compile -j1 V=s
+          # 把所有 .config 选中的软件包逐个编译，先暴露真实的包级错误，再进入固件编译。
+          # -j1 保留完整、可定位的 V=s 原文；失败会立即停止，不再等数小时到总编译末尾才发现。
+          make package/compile -j1 V=s 2>&1 | tee "$GITHUB_WORKSPACE/build-reports/preflight-package-compile.log"
+
+          # 再逐个安装到 staging/rootfs，提前检查文件冲突、依赖闭包和安装阶段错误。
+          make package/install -j1 V=s 2>&1 | tee "$GITHUB_WORKSPACE/build-reports/preflight-package-install.log"
 
       - name: Compile Firmware
         if: ${{ !inputs.WRT_TEST }}
