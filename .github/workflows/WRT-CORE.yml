@@ -194,9 +194,14 @@ jobs:
           $GITHUB_WORKSPACE/Scripts/Settings.sh
           $GITHUB_WORKSPACE/.github/scripts/prepare-build-host.sh
 
-          # Packages.sh 优先把 VIKINGYFY/sing-box 放入 package/sing-box；若仓库布局把它留在 feeds/base，先提升到主路径。
+          # Packages.sh 优先把 VIKINGYFY/sing-box 放入 package/sing-box；先实体化主路径，再清理别名，避免符号链接把主包一起删除。
           SING_BOX_MAIN="./package/sing-box"
-          if [ ! -f "$SING_BOX_MAIN/Makefile" ]; then
+          SING_BOX_STAGE="./tmp/sing-box-main"
+          rm -rf "$SING_BOX_STAGE"
+          SING_BOX_SOURCE_DIR=""
+          if [ -f "$SING_BOX_MAIN/Makefile" ]; then
+            SING_BOX_SOURCE_DIR="$SING_BOX_MAIN"
+          else
             for CANDIDATE in \
               ./feeds/base/sing-box \
               ./feeds/base/feeds/packages/sing-box \
@@ -204,15 +209,26 @@ jobs:
               ./package/feeds/base/sing-box \
               ./package/feeds/packages/sing-box; do
               if [ -f "$CANDIDATE/Makefile" ]; then
-                rm -rf "$SING_BOX_MAIN"
-                cp -a "$CANDIDATE" "$SING_BOX_MAIN"
-                echo "Promote sing-box source: $CANDIDATE -> $SING_BOX_MAIN"
+                SING_BOX_SOURCE_DIR="$CANDIDATE"
                 break
               fi
             done
           fi
+          if [ -z "$SING_BOX_SOURCE_DIR" ]; then
+            echo "sing-box-source-not-found"
+            exit 1
+          fi
 
-          # 删除主路径之外的重复源；主路径必须保留给 OpenWrt 扫描。
+          # -aL 强制复制真实文件内容；随后 package/sing-box 一定是实体目录，不再依赖链接目标。
+          mkdir -p ./tmp
+          cp -aL "$SING_BOX_SOURCE_DIR" "$SING_BOX_STAGE"
+          rm -rf "$SING_BOX_MAIN"
+          cp -a "$SING_BOX_STAGE" "$SING_BOX_MAIN"
+          rm -rf "$SING_BOX_STAGE"
+          test -f "$SING_BOX_MAIN/Makefile"
+          echo "sing-box main source: $SING_BOX_SOURCE_DIR -> $SING_BOX_MAIN"
+
+          # 删除主路径之外的重复源；主路径保留给 OpenWrt 扫描。
           for DIR in \
             ./feeds/base/sing-box \
             ./feeds/base/feeds/packages/sing-box \
@@ -225,21 +241,18 @@ jobs:
             fi
           done
 
-          SING_BOX_SOURCES=$(find -L ./package ./feeds -type f -path '*/sing-box/Makefile' -print 2>/dev/null | sort -u)
-          SING_BOX_COUNT=$(printf '%s\n' "$SING_BOX_SOURCES" | sed '/^$/d' | wc -l)
-          echo "sing-box sources ($SING_BOX_COUNT):"
-          printf '%s\n' "$SING_BOX_SOURCES"
-          if [ "$SING_BOX_COUNT" -ne 1 ]; then
-            echo "sing-box-source-count-invalid"
+          # 直接验证实体主包，并单独检查 feed 别名；不依赖跨树 find 的符号链接行为。
+          if [ "$(find -L "$SING_BOX_MAIN" -maxdepth 1 -type f -name Makefile -print | wc -l)" -ne 1 ]; then
+            echo "sing-box-main-makefile-invalid"
             exit 1
           fi
-          SING_BOX_SOURCE=$(printf '%s\n' "$SING_BOX_SOURCES" | sed -n '1p')
-          echo "sing-box source: $SING_BOX_SOURCE"
-          if [ "$SING_BOX_SOURCE" != "./package/sing-box/Makefile" ]; then
-            echo "sing-box-not-in-main-package-tree"
+          EXTRA_SING_BOX_SOURCES=$(find -L ./feeds ./package/feeds -type f -path '*/sing-box/Makefile' -print 2>/dev/null | sort -u)
+          if [ -n "$EXTRA_SING_BOX_SOURCES" ]; then
+            echo "sing-box-duplicate-sources:"
+            printf '%s\n' "$EXTRA_SING_BOX_SOURCES"
             exit 1
           fi
-
+          echo "sing-box source: $SING_BOX_MAIN/Makefile"
           # .config 中写成 y 不能证明包一定被 OpenWrt 注册；先逐项检查 Makefile 和 Package 定义。
           for REQUIRED_SPEC in \
             "sing-box:./package/sing-box/Makefile" \
