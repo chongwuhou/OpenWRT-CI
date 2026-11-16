@@ -283,3 +283,4 @@ CONFIG_DOCKER_STO_BTRFS=y
 # ci: rebuild after reusable workflow yaml repair
 # ci: rerun after sing-box source promotion fix
 # sing-box source canonicalization retry
+# preserve feed sources during sing-box cleanup
