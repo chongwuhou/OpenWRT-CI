@@ -273,8 +273,14 @@ jobs:
             "kcptun-client:./package/kcptun-client/Makefile"; do
             NAME="${REQUIRED_SPEC%%:*}"
             MAKEFILE="${REQUIRED_SPEC#*:}"
-            if [ ! -f "$MAKEFILE" ] || ! grep -q "define Package/$NAME" "$MAKEFILE"; then
-              echo "package-source-or-definition-missing: $NAME ($MAKEFILE)"
+            if [ ! -f "$MAKEFILE" ]; then
+              echo "package-source-missing: $NAME ($MAKEFILE)"
+              exit 1
+            fi
+            # 标准包使用 define Package/...；LuCI 官方包也可能使用 LUCI_TITLE + PKG_NAME，并由 luci.mk 注册。
+            if ! grep -Eq '^define Package/($(PKG_NAME)|'"$NAME"')' "$MAKEFILE" \
+              && ! grep -q '^LUCI_TITLE:=' "$MAKEFILE"; then
+              echo "package-definition-missing: $NAME ($MAKEFILE)"
               exit 1
             fi
           done
