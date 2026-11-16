@@ -369,25 +369,23 @@ jobs:
               "https://github.com/bootmortis/iran-hosted-domains/releases/download/$GEOSITE_IRAN_VER/iran.dat"
           fi
 
-      - name: Preflight All Selected Packages
+      - name: Preflight Build Dependencies
         if: ${{ !inputs.WRT_TEST }}
         run: |
           cd ./wrt/
           set -o pipefail
           mkdir -p "$GITHUB_WORKSPACE/build-reports"
 
-          # 只使用 OpenWrt 的公开构建目标，按 tools -> toolchain -> target -> package 顺序建立依赖链。
-          # package/stamp-* 是内部变量/标记，不是可直接调用的 make 目标。
+          # 只提前建立 tools -> toolchain -> target 依赖链；所有选中软件包只在最终并行固件编译中编译一次。
+          # 全量 package/compile -j1 会把 libcronet 等大型包串行化，容易超过 GitHub Actions 的 6 小时上限。
           run_make() {
             local NAME="$1"
             shift
-            make "$@" -j1 V=s 2>&1 | tee "$GITHUB_WORKSPACE/build-reports/preflight-$NAME.log"
+            make "$@" -j$(nproc) V=s 2>&1 | tee "$GITHUB_WORKSPACE/build-reports/preflight-$NAME.log"
           }
           run_make tools-compile tools/compile
           run_make toolchain-compile toolchain/compile
           run_make target-compile target/compile
-          run_make package-compile package/compile
-          run_make package-install package/install
 
       - name: Compile Firmware
         if: ${{ !inputs.WRT_TEST }}

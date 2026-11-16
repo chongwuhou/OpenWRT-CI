@@ -8,6 +8,11 @@ on:
   push:
     paths:
       - Config/S20P-WIFI-YES.txt
+      - Scripts/Packages.sh
+      - Scripts/Handles.sh
+      - Scripts/Settings.sh
+      - .github/workflows/WRT-CORE.yml
+      - .github/workflows/S20P.yml
   workflow_dispatch:
     inputs:
       PACKAGE:
