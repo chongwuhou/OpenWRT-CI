@@ -294,3 +294,4 @@ CONFIG_DOCKER_STO_BTRFS=y
 # CI preflight: all selected package compile and install
 # CI preflight: allow make-expanded package versions
 # CI preflight: official OpenWrt dependency stamps
+# CI preflight: confirmed supergateway_s20p is CLX S20P
