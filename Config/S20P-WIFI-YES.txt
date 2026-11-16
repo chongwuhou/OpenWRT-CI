@@ -286,3 +286,4 @@ CONFIG_DOCKER_STO_BTRFS=y
 # preserve feed sources during sing-box cleanup
 # install PassWall using official luci-app directory names
 # accept variable-based package definitions from official OpenClash
+# remove obsolete netspeedtest python3-pkg-resources dependency
