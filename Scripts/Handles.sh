@@ -137,6 +137,36 @@ if [ -f "$DOCKERMAN_MAKE" ] && grep -q '^PKG_VERSION:=v' "$DOCKERMAN_MAKE"; then
 		's/^PKG_VERSION:=v/PKG_VERSION:=/' \\
 		"$DOCKERMAN_MAKE"
 fi
+# nps-openwrt 当前 main 将预编译包版本占位为 null；这会生成无效下载/打包元数据。
+# 固定到官方最新发布，并同步 S20P aarch64 的 client/server 校验值。
+NPS_VERSION="0.35.3"
+NPS_CLIENT_ARM64_HASH="e6577403c90926f280224969863fc952c50d01608168acbb40332f0d5c3a4e51"
+NPS_SERVER_ARM64_HASH="2a4f161eb8c768d597361d8a75a355ab67e0ce541bbb958bd21704df4176ceeb"
+PATCH_NPS_MAKEFILE() {
+	local MAKEFILE=$1
+	local ARM64_HASH=$2
+	sed -i "s/^PKG_VERSION:=null$/PKG_VERSION:=$NPS_VERSION/" "$MAKEFILE"
+	sed -i -E "s/^([[:space:]]*arm64=)[0-9a-f]+/\\1$ARM64_HASH/" "$MAKEFILE"
+}
+for NPS_SPEC in \
+	"npc:$PACKAGE_PATH/npc/Makefile:$NPS_CLIENT_ARM64_HASH" \
+	"nps:$PACKAGE_PATH/nps/Makefile:$NPS_SERVER_ARM64_HASH"; do
+	NPS_NAME=${NPS_SPEC%%:*}
+	NPS_REST=${NPS_SPEC#*:}
+	NPS_MAKE=${NPS_REST%%:*}
+	NPS_HASH=${NPS_REST#*:}
+	if [ -f "$NPS_MAKE" ] && grep -q '^PKG_VERSION:=null
+DOCKER_INIT="$FEEDS_PATH/packages/utils/dockerd/files/dockerd.init"
+if [ -f "$DOCKER_INIT" ] && grep -q $'^\tuciadd$' "$DOCKER_INIT"; then
+	FIX "dockerd-fw4-boot" "$FEEDS_PATH/packages/utils/dockerd" sed -i \
+		'/^boot() {/,/^}/ s/^[[:space:]]*uciadd$/	if ! uci_quiet get network.docker || ! uci_quiet get firewall.docker; then\n		uciadd\n	fi/' \
+		"$DOCKER_INIT"
+fi
+ "$NPS_MAKE"; then
+		FIX "$NPS_NAME-release-metadata" "$(dirname "$NPS_MAKE")" PATCH_NPS_MAKEFILE "$NPS_MAKE" "$NPS_HASH"
+	fi
+done
+
 
 # Docker + fw4：避免 dockerd 每次开机都重复 uciadd/reload_config，触发重复的 docker_devices 定义。
 DOCKER_INIT="$FEEDS_PATH/packages/utils/dockerd/files/dockerd.init"
