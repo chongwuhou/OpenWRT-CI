@@ -130,6 +130,14 @@ if [ -f "$DOCKER_LIB_MAKE" ] && grep -q '^PKG_VERSION:=v' "$DOCKER_LIB_MAKE"; th
 fi
 
 
+# luci-app-dockerman 也沿用 v0.5.26；APK 版本字段必须使用无 v 前缀的规范版本。
+DOCKERMAN_MAKE="$PACKAGE_PATH/luci-app-dockerman/Makefile"
+if [ -f "$DOCKERMAN_MAKE" ] && grep -q '^PKG_VERSION:=v' "$DOCKERMAN_MAKE"; then
+	FIX "luci-app-dockerman-apk-version" "$PACKAGE_PATH/luci-app-dockerman" sed -i \\
+		's/^PKG_VERSION:=v/PKG_VERSION:=/' \\
+		"$DOCKERMAN_MAKE"
+fi
+
 # Docker + fw4：避免 dockerd 每次开机都重复 uciadd/reload_config，触发重复的 docker_devices 定义。
 DOCKER_INIT="$FEEDS_PATH/packages/utils/dockerd/files/dockerd.init"
 if [ -f "$DOCKER_INIT" ] && grep -q $'^\tuciadd$' "$DOCKER_INIT"; then
