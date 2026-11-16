@@ -289,3 +289,4 @@ CONFIG_DOCKER_STO_BTRFS=y
 # remove obsolete netspeedtest python3-pkg-resources dependency
 # include SSR Plus+ official shadowsocksr-libev packages
 # CI preflight: selected-package APK metadata audit
+# CI preflight: critical package compile gate
