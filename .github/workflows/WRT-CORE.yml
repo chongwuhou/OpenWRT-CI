@@ -341,9 +341,18 @@ jobs:
             if grep -q "^CONFIG_PACKAGE_$PKG_NAME=y" .config && [ -n "$PKG_VERSION" ]; then
               case "$PKG_VERSION" in
                 [0-9]*) ;;
-                *)
+                v*|V*|null|NULL|undefined|UNDEFINED)
                   echo "invalid-selected-apk-version: $PKG_NAME ($MAKEFILE): PKG_VERSION=$PKG_VERSION"
                   INVALID_APK_VERSIONS=1
+                  ;;
+                *)
+                  # 允许由 Make 展开后得到数字版本的表达式；其余静态非数字版本仍提前拦截。
+                  if [[ "$PKG_VERSION" == *'$('* || "$PKG_VERSION" == *'${'* ]]; then
+                    :
+                  else
+                    echo "invalid-selected-apk-version: $PKG_NAME ($MAKEFILE): PKG_VERSION=$PKG_VERSION"
+                    INVALID_APK_VERSIONS=1
+                  fi
                   ;;
               esac
             fi
