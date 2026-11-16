@@ -337,9 +337,15 @@ jobs:
             [ -f "$MAKEFILE" ] || continue
             PKG_NAME=$(sed -n 's/^PKG_NAME:=//p' "$MAKEFILE" | head -n 1)
             [ -n "$PKG_NAME" ] || continue
-            if grep -q "^CONFIG_PACKAGE_$PKG_NAME=y" .config && grep -Eq '^PKG_VERSION:=[vV]' "$MAKEFILE"; then
-              echo "invalid-selected-apk-version: $PKG_NAME ($MAKEFILE): $(grep -m1 '^PKG_VERSION:=' "$MAKEFILE")"
-              INVALID_APK_VERSIONS=1
+            PKG_VERSION=$(sed -n 's/^PKG_VERSION:=//p' "$MAKEFILE" | head -n 1)
+            if grep -q "^CONFIG_PACKAGE_$PKG_NAME=y" .config && [ -n "$PKG_VERSION" ]; then
+              case "$PKG_VERSION" in
+                [0-9]*) ;;
+                *)
+                  echo "invalid-selected-apk-version: $PKG_NAME ($MAKEFILE): PKG_VERSION=$PKG_VERSION"
+                  INVALID_APK_VERSIONS=1
+                  ;;
+              esac
             fi
           done < <(find -L ./package ./feeds -type f -name Makefile -print 2>/dev/null | sort -u)
           if [ "$INVALID_APK_VERSIONS" -ne 0 ]; then
