@@ -410,6 +410,14 @@ jobs:
               "https://github.com/bootmortis/iran-hosted-domains/releases/download/$GEOSITE_IRAN_VER/iran.dat"
           fi
 
+      - name: Preflight Critical Package Compile
+        if: ${{ !inputs.WRT_TEST }}
+        run: |
+          cd ./wrt/
+
+          # 先顺序编译最容易在总编译末尾暴露问题的关键包；失败时保留完整 V=s 原文。
+          make package/npc/compile package/nps/compile package/mihomo/compile package/luci-lib-docker/compile package/luci-app-dockerman/compile -j1 V=s
+
       - name: Compile Firmware
         if: ${{ !inputs.WRT_TEST }}
         run: |
