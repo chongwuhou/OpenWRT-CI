@@ -101,8 +101,8 @@ UPDATE_PACKAGE "dns2socks-rust" "fw876/helloworld" "v198.3" "pkg"
 UPDATE_PACKAGE "naiveproxy" "Openwrt-Passwall/openwrt-passwall-packages" "main" "pkg"
 # 独立包仓库，包名明确为 kcptun-client，避免从大杂烩仓库复制到错误目录。
 UPDATE_PACKAGE "kcptun-client" "permails/kcptun-client" "main" "pkg"
-UPDATE_PACKAGE "passwall" "Openwrt-Passwall/openwrt-passwall" "main" "pkg"
-UPDATE_PACKAGE "passwall2" "Openwrt-Passwall/openwrt-passwall2" "main" "pkg"
+UPDATE_PACKAGE "luci-app-passwall" "Openwrt-Passwall/openwrt-passwall" "main" "pkg"
+UPDATE_PACKAGE "luci-app-passwall2" "Openwrt-Passwall/openwrt-passwall2" "main" "pkg"
 
 # S20P 参考固件中的应用与管理组件
 UPDATE_PACKAGE "luci-app-store" "linkease/istore" "main" "pkg" "luci-lib-taskd luci-lib-xterm taskd"
