@@ -284,3 +284,4 @@ CONFIG_DOCKER_STO_BTRFS=y
 # ci: rerun after sing-box source promotion fix
 # sing-box source canonicalization retry
 # preserve feed sources during sing-box cleanup
+# install PassWall using official luci-app directory names
