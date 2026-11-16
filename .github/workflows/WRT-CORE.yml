@@ -293,9 +293,20 @@ jobs:
             exit 1
           fi
 
-          if grep -Eiq "does not exist|recursive dependency|undefined symbol|unmet direct dependencies" "$DEFCONFIG_LOG"; then
-            echo "defconfig-dependency-audit-failed"
-            grep -Ein "does not exist|recursive dependency|undefined symbol|unmet direct dependencies" "$DEFCONFIG_LOG" || true
+          # defconfig 会扫描所有 feeds，即使未选中的可选包也可能发出不存在依赖警告。
+          # 只对 .config 实际选中的包判定为阻塞，避免把未参与本固件的包误报成失败。
+          SELECTED_DEPENDENCY_WARNINGS=0
+          while IFS= read -r WARNING; do
+            [ -n "$WARNING" ] || continue
+            MAKEFILE=$(sed -n "s/^WARNING: Makefile '\\([^']*\\)'.*/\\1/p" <<< "$WARNING")
+            PKG_NAME=$(sed -n 's/^PKG_NAME:=//p' "$MAKEFILE" 2>/dev/null | head -n 1 | tr -d '\\r')
+            if [ -n "$PKG_NAME" ] && grep -q "^CONFIG_PACKAGE_$PKG_NAME=y" .config; then
+              echo "$WARNING"
+              SELECTED_DEPENDENCY_WARNINGS=1
+            fi
+          done < <(grep -Ei "WARNING: Makefile .* dependency on '.*', which does not exist" "$DEFCONFIG_LOG" || true)
+          if [ "$SELECTED_DEPENDENCY_WARNINGS" -ne 0 ]; then
+            echo "defconfig-selected-dependency-audit-failed"
             exit 1
           fi
 
