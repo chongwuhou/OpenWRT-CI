@@ -148,25 +148,12 @@ PATCH_NPS_MAKEFILE() {
 	sed -i "s/^PKG_VERSION:=null$/PKG_VERSION:=$NPS_VERSION/" "$MAKEFILE"
 	sed -i -E "s/^([[:space:]]*arm64=)[0-9a-f]+/\\1$ARM64_HASH/" "$MAKEFILE"
 }
-for NPS_SPEC in \
-	"npc:$PACKAGE_PATH/npc/Makefile:$NPS_CLIENT_ARM64_HASH" \
-	"nps:$PACKAGE_PATH/nps/Makefile:$NPS_SERVER_ARM64_HASH"; do
-	NPS_NAME=${NPS_SPEC%%:*}
-	NPS_REST=${NPS_SPEC#*:}
-	NPS_MAKE=${NPS_REST%%:*}
-	NPS_HASH=${NPS_REST#*:}
-	if [ -f "$NPS_MAKE" ] && grep -q '^PKG_VERSION:=null
-DOCKER_INIT="$FEEDS_PATH/packages/utils/dockerd/files/dockerd.init"
-if [ -f "$DOCKER_INIT" ] && grep -q $'^\tuciadd$' "$DOCKER_INIT"; then
-	FIX "dockerd-fw4-boot" "$FEEDS_PATH/packages/utils/dockerd" sed -i \
-		'/^boot() {/,/^}/ s/^[[:space:]]*uciadd$/	if ! uci_quiet get network.docker || ! uci_quiet get firewall.docker; then\n		uciadd\n	fi/' \
-		"$DOCKER_INIT"
+if [ -f "$PACKAGE_PATH/npc/Makefile" ] && grep -q "^PKG_VERSION:=null$" "$PACKAGE_PATH/npc/Makefile"; then
+	FIX "npc-release-metadata" "$PACKAGE_PATH/npc" PATCH_NPS_MAKEFILE "$PACKAGE_PATH/npc/Makefile" "$NPS_CLIENT_ARM64_HASH"
 fi
- "$NPS_MAKE"; then
-		FIX "$NPS_NAME-release-metadata" "$(dirname "$NPS_MAKE")" PATCH_NPS_MAKEFILE "$NPS_MAKE" "$NPS_HASH"
-	fi
-done
-
+if [ -f "$PACKAGE_PATH/nps/Makefile" ] && grep -q "^PKG_VERSION:=null$" "$PACKAGE_PATH/nps/Makefile"; then
+	FIX "nps-release-metadata" "$PACKAGE_PATH/nps" PATCH_NPS_MAKEFILE "$PACKAGE_PATH/nps/Makefile" "$NPS_SERVER_ARM64_HASH"
+fi
 
 # Docker + fw4：避免 dockerd 每次开机都重复 uciadd/reload_config，触发重复的 docker_devices 定义。
 DOCKER_INIT="$FEEDS_PATH/packages/utils/dockerd/files/dockerd.init"
