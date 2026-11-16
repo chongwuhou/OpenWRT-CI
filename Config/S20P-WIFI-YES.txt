@@ -285,3 +285,4 @@ CONFIG_DOCKER_STO_BTRFS=y
 # sing-box source canonicalization retry
 # preserve feed sources during sing-box cleanup
 # install PassWall using official luci-app directory names
+# accept variable-based package definitions from official OpenClash
