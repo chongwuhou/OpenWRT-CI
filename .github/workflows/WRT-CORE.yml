@@ -194,8 +194,31 @@ jobs:
           $GITHUB_WORKSPACE/Scripts/Settings.sh
           $GITHUB_WORKSPACE/.github/scripts/prepare-build-host.sh
 
-          # Packages.sh 已把 VIKINGYFY/sing-box 写入 package/sing-box，确保它进入 OpenWrt 主构建树。
-          for DIR in ./feeds/base/sing-box ./feeds/base/feeds/packages/sing-box ./package/feeds/base/sing-box ./feeds/packages/net/sing-box ./package/feeds/packages/sing-box; do
+          # Packages.sh 优先把 VIKINGYFY/sing-box 放入 package/sing-box；若仓库布局把它留在 feeds/base，先提升到主路径。
+          SING_BOX_MAIN="./package/sing-box"
+          if [ ! -f "$SING_BOX_MAIN/Makefile" ]; then
+            for CANDIDATE in \
+              ./feeds/base/sing-box \
+              ./feeds/base/feeds/packages/sing-box \
+              ./feeds/packages/net/sing-box \
+              ./package/feeds/base/sing-box \
+              ./package/feeds/packages/sing-box; do
+              if [ -f "$CANDIDATE/Makefile" ]; then
+                rm -rf "$SING_BOX_MAIN"
+                cp -a "$CANDIDATE" "$SING_BOX_MAIN"
+                echo "Promote sing-box source: $CANDIDATE -> $SING_BOX_MAIN"
+                break
+              fi
+            done
+          fi
+
+          # 删除主路径之外的重复源；主路径必须保留给 OpenWrt 扫描。
+          for DIR in \
+            ./feeds/base/sing-box \
+            ./feeds/base/feeds/packages/sing-box \
+            ./package/feeds/base/sing-box \
+            ./feeds/packages/net/sing-box \
+            ./package/feeds/packages/sing-box; do
             if [ -e "$DIR" ] || [ -L "$DIR" ]; then
               rm -rf "$DIR"
               echo "Delete duplicate sing-box before defconfig: $DIR"
