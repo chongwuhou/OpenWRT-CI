@@ -98,7 +98,7 @@ UPDATE_PACKAGE "openclash" "vernesong/OpenClash" "dev" "pkg"
 UPDATE_PACKAGE "luci-app-ssr-plus" "fw876/helloworld" "v198.3" "pkg" "mihomo"
 UPDATE_PACKAGE "dns2socks-rust" "fw876/helloworld" "v198.3" "pkg"
 # NaiveProxy 使用 PassWall 官方配套仓库的 OpenWrt 预编译包，避免 Chromium 源码构建造成超长等待和架构兼容风险。
-UPDATE_PACKAGE "naiveproxy" "Openwrt-Passwall/openwrt-passwall-packages" "main" "pkg"
+UPDATE_PACKAGE "naiveproxy" "Openwrt-Passwall/openwrt-passwall-packages" "main" "pkg" "shadowsocksr-libev"
 # 独立包仓库，包名明确为 kcptun-client，避免从大杂烩仓库复制到错误目录。
 UPDATE_PACKAGE "kcptun-client" "permails/kcptun-client" "main" "pkg"
 UPDATE_PACKAGE "luci-app-passwall" "Openwrt-Passwall/openwrt-passwall" "main" "pkg"
