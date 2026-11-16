@@ -112,6 +112,17 @@ if [ -f "$GEO_MAKE" ] && grep -q '\$(call Download,geoip)' "$GEO_MAKE"; then
 	FIX "v2ray-geodata-prefetch-only" "$FEEDS_PATH/packages/net/v2ray-geodata" PATCH_GEODATA
 fi
 
+
+# luci-lib-docker 仍使用 v0.3.4；ImmortalWrt 当前 APK 打包器拒绝带 v 前缀的版本号。
+# 只改打包版本字段，不改 LuCI 代码或运行时 API。
+DOCKER_LIB_MAKE="$PACKAGE_PATH/luci-lib-docker/Makefile"
+if [ -f "$DOCKER_LIB_MAKE" ] && grep -q '^PKG_VERSION:=v' "$DOCKER_LIB_MAKE"; then
+	FIX "luci-lib-docker-apk-version" "$PACKAGE_PATH/luci-lib-docker" sed -i \
+		's/^PKG_VERSION:=v/PKG_VERSION:=/' \
+		"$DOCKER_LIB_MAKE"
+fi
+
+
 # Docker + fw4：避免 dockerd 每次开机都重复 uciadd/reload_config，触发重复的 docker_devices 定义。
 DOCKER_INIT="$FEEDS_PATH/packages/utils/dockerd/files/dockerd.init"
 if [ -f "$DOCKER_INIT" ] && grep -q $'^\tuciadd$' "$DOCKER_INIT"; then
