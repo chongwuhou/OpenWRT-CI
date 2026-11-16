@@ -299,7 +299,7 @@ jobs:
           while IFS= read -r WARNING; do
             [ -n "$WARNING" ] || continue
             MAKEFILE=$(sed -n "s/^WARNING: Makefile '\\([^']*\\)'.*/\\1/p" <<< "$WARNING")
-            PKG_NAME=$(sed -n 's/^PKG_NAME:=//p' "$MAKEFILE" 2>/dev/null | head -n 1 | tr -d '\\r')
+            PKG_NAME=$(sed -n 's/^PKG_NAME:=//p' "$MAKEFILE" 2>/dev/null | head -n 1)
             if [ -n "$PKG_NAME" ] && grep -q "^CONFIG_PACKAGE_$PKG_NAME=y" .config; then
               echo "$WARNING"
               SELECTED_DEPENDENCY_WARNINGS=1
