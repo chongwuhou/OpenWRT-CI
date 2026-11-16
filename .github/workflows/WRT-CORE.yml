@@ -194,7 +194,7 @@ jobs:
           $GITHUB_WORKSPACE/Scripts/Settings.sh
           $GITHUB_WORKSPACE/.github/scripts/prepare-build-host.sh
 
-          # Packages.sh 优先把 VIKINGYFY/sing-box 放入 package/sing-box；先实体化主路径，再清理别名，避免符号链接把主包一起删除。
+          # Packages.sh 优先把 VIKINGYFY/sing-box 放入 package/sing-box；只清理 package/feeds 安装链接，保留 feeds 源避免链接别名误删主包。
           SING_BOX_MAIN="./package/sing-box"
           SING_BOX_STAGE="./tmp/sing-box-main"
           rm -rf "$SING_BOX_STAGE"
@@ -219,7 +219,7 @@ jobs:
             exit 1
           fi
 
-          # -aL 强制复制真实文件内容；随后 package/sing-box 一定是实体目录，不再依赖链接目标。
+          # -aL 强制复制真实文件内容；随后 package/sing-box 一定是实体目录。
           mkdir -p ./tmp
           cp -aL "$SING_BOX_SOURCE_DIR" "$SING_BOX_STAGE"
           rm -rf "$SING_BOX_MAIN"
@@ -228,27 +228,28 @@ jobs:
           test -f "$SING_BOX_MAIN/Makefile"
           echo "sing-box main source: $SING_BOX_SOURCE_DIR -> $SING_BOX_MAIN"
 
-          # 删除主路径之外的重复源；主路径保留给 OpenWrt 扫描。
+          # 只移除 package/feeds 下的安装链接或副本；feeds/base 与 feeds/packages 是源仓库目录，不能递归删除。
           for DIR in \
-            ./feeds/base/sing-box \
-            ./feeds/base/feeds/packages/sing-box \
             ./package/feeds/base/sing-box \
-            ./feeds/packages/net/sing-box \
-            ./package/feeds/packages/sing-box; do
-            if [ -e "$DIR" ] || [ -L "$DIR" ]; then
+            ./package/feeds/packages/sing-box \
+            ./package/feeds/luci/sing-box; do
+            if [ -L "$DIR" ]; then
+              unlink "$DIR"
+              echo "Unlink duplicate sing-box feed link: $DIR"
+            elif [ -d "$DIR" ]; then
               rm -rf "$DIR"
-              echo "Delete duplicate sing-box before defconfig: $DIR"
+              echo "Delete duplicate sing-box package link: $DIR"
             fi
           done
 
-          # 直接验证实体主包，并单独检查 feed 别名；不依赖跨树 find 的符号链接行为。
+          # 直接验证实体主包，并检查 package/feeds 中没有残留安装源。
           if [ "$(find -L "$SING_BOX_MAIN" -maxdepth 1 -type f -name Makefile -print | wc -l)" -ne 1 ]; then
             echo "sing-box-main-makefile-invalid"
             exit 1
           fi
-          EXTRA_SING_BOX_SOURCES=$(find -L ./feeds ./package/feeds -type f -path '*/sing-box/Makefile' -print 2>/dev/null | sort -u)
+          EXTRA_SING_BOX_SOURCES=$(find -L ./package/feeds -type f -path '*/sing-box/Makefile' -print 2>/dev/null | sort -u)
           if [ -n "$EXTRA_SING_BOX_SOURCES" ]; then
-            echo "sing-box-duplicate-sources:"
+            echo "sing-box-duplicate-package-sources:"
             printf '%s\n' "$EXTRA_SING_BOX_SOURCES"
             exit 1
           fi
