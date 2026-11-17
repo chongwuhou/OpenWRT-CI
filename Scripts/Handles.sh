@@ -183,7 +183,8 @@ if [[ "${WRT_CONFIG:-}" == S20P* ]]; then
 	if grep -Eqi 'eip93|^ifeq[[:space:]]+\(\$\(GO_ARCH\),arm64\)' "$MIHOMO_MAKE"; then
 		echo "mihomo S20P EIP93 overlay removal assertion failed"
 		exit 1
-	fi	if grep -qF '$(STAGING_DIR_HOST)/bin/upx' "$MIHOMO_MAKE"; then
+	fi
+	if grep -qF '$(STAGING_DIR_HOST)/bin/upx' "$MIHOMO_MAKE"; then
 		echo "mihomo UPX path assertion failed: still references STAGING_DIR_HOST"
 		exit 1
 	fi
