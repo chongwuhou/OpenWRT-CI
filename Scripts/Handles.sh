@@ -164,6 +164,14 @@ PATCH_MIHOMO_NO_EIP93() {
 		END { if (!found || skip != 0) exit 1 }
 	' "$MAKEFILE" > "$TMPFILE" && mv "$TMPFILE" "$MAKEFILE"
 }
+# ImmortalWrt 的 upx/host 在 package 构建上下文中安装到 hostpkg/bin，
+# mihomo 上游 Makefile 使用 STAGING_DIR_HOST 会在 UPX 压缩阶段找不到文件。
+if [ -f "$MIHOMO_MAKE" ] && grep -qF '$(STAGING_DIR_HOST)/bin/upx' "$MIHOMO_MAKE"; then
+	FIX "mihomo-upx-hostpkg-path" "$PACKAGE_PATH/mihomo" sed -i \
+		's|\$(STAGING_DIR_HOST)/bin/upx|\$(STAGING_DIR_HOSTPKG)/bin/upx|g' \
+		"$MIHOMO_MAKE"
+fi
+
 if [[ "${WRT_CONFIG:-}" == S20P* ]]; then
 	if [ ! -f "$MIHOMO_MAKE" ]; then
 		echo "required S20P mihomo Makefile missing: $MIHOMO_MAKE"
@@ -174,6 +182,13 @@ if [[ "${WRT_CONFIG:-}" == S20P* ]]; then
 	fi
 	if grep -Eqi 'eip93|^ifeq[[:space:]]+\(\$\(GO_ARCH\),arm64\)' "$MIHOMO_MAKE"; then
 		echo "mihomo S20P EIP93 overlay removal assertion failed"
+		exit 1
+	fi	if grep -qF '$(STAGING_DIR_HOST)/bin/upx' "$MIHOMO_MAKE"; then
+		echo "mihomo UPX path assertion failed: still references STAGING_DIR_HOST"
+		exit 1
+	fi
+	if ! grep -qF '$(STAGING_DIR_HOSTPKG)/bin/upx' "$MIHOMO_MAKE"; then
+		echo "mihomo UPX path assertion failed: missing STAGING_DIR_HOSTPKG"
 		exit 1
 	fi
 fi
