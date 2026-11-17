@@ -118,6 +118,14 @@ if [ -f "$PACKAGE_PATH/nps/Makefile" ] && grep -q "^PKG_VERSION:=null$" "$PACKAG
 	FIX "nps-release-metadata" "$PACKAGE_PATH/nps" PATCH_NPS_MAKEFILE "$PACKAGE_PATH/nps/Makefile" "$NPS_SERVER_ARM64_HASH"
 fi
 
+# mihomo：fw876/helloworld 的 UPX 调用仍指向旧的 host/bin；ImmortalWrt 的 upx/host 安装在 hostpkg/bin。
+# 这是构建系统路径兼容修正，不改 mihomo 源码和功能；在 S20P 阶段强制断言，避免再次编译数十分钟后才暴露。
+MIHOMO_MAKE="$PACKAGE_PATH/mihomo/Makefile"
+if [ -f "$MIHOMO_MAKE" ] && grep -qF '$(STAGING_DIR_HOST)/bin/upx' "$MIHOMO_MAKE"; then
+	FIX "mihomo-upx-hostpkg-path" "$PACKAGE_PATH/mihomo" sed -i 		's|\$(STAGING_DIR_HOST)/bin/upx|\$(STAGING_DIR_HOSTPKG)/bin/upx|g' 		"$MIHOMO_MAKE"
+fi
+
+
 # Docker + fw4：避免 dockerd 每次开机都重复 uciadd/reload_config，触发重复的 docker_devices 定义。
 DOCKER_INIT="$FEEDS_PATH/packages/utils/dockerd/files/dockerd.init"
 if [ -f "$DOCKER_INIT" ] && grep -q $'^\tuciadd$' "$DOCKER_INIT"; then
@@ -138,5 +146,17 @@ if [[ "${WRT_CONFIG:-}" == S20P* ]]; then
 			exit 1
 		fi
 	done
+	if [ ! -f "$MIHOMO_MAKE" ]; then
+		echo "required S20P mihomo Makefile missing: $MIHOMO_MAKE"
+		exit 1
+	fi
+	if grep -qF '$(STAGING_DIR_HOST)/bin/upx' "$MIHOMO_MAKE"; then
+		echo "S20P mihomo UPX path assertion failed: still references STAGING_DIR_HOST"
+		exit 1
+	fi
+	if ! grep -qF '$(STAGING_DIR_HOSTPKG)/bin/upx' "$MIHOMO_MAKE"; then
+		echo "S20P mihomo UPX path assertion failed: missing STAGING_DIR_HOSTPKG"
+		exit 1
+	fi
 fi
 
