@@ -232,7 +232,7 @@ jobs:
             exit 1
           fi
           # .config 中写成 y 不能证明包一定被 OpenWrt 注册；
-先逐项检查 Makefile 和 Package 定义。
+          # 先逐项检查 Makefile 和 Package 定义。
           for REQUIRED_SPEC in \
             "sing-box:$SING_BOX_MAIN/Makefile" \
             "naiveproxy:./package/naiveproxy/Makefile" \
@@ -347,19 +347,6 @@ jobs:
           done
           echo "preflight-package-metadata-audit: passed"
 
-      - name: Preflight sing-box source patch
-        if: ${{ !inputs.WRT_TEST }}
-        run: |
-          cd ./wrt/
-          set -o pipefail
-          mkdir -p "$GITHUB_WORKSPACE/build-reports"
-          # 只执行 sing-box 的下载、解包和补丁应用，不编译 Go；补丁失败在分钟级暴露。
-          if ! make package/sing-box/prepare -j1 V=s 2>&1 | tee "$GITHUB_WORKSPACE/build-reports/preflight-sing-box-prepare.log"; then
-            echo "preflight-sing-box-prepare-failed"
-            exit 1
-          fi
-          echo "preflight-sing-box-prepare: passed"
-
       - name: Prepare Rust Toolchain
         if: ${{ !inputs.WRT_TEST }}
         run: |
@@ -407,6 +394,19 @@ jobs:
             download_geo "v2ray-geosite-ir" "$GEOSITE_IRAN_VER" "iran.dat.$GEOSITE_IRAN_VER" "$GEOSITE_IRAN_HASH" \
               "https://github.com/bootmortis/iran-hosted-domains/releases/download/$GEOSITE_IRAN_VER/iran.dat"
           fi
+
+      - name: Preflight sing-box source patch
+        if: ${{ !inputs.WRT_TEST }}
+        run: |
+          cd ./wrt/
+          set -o pipefail
+          mkdir -p "$GITHUB_WORKSPACE/build-reports"
+          # 只执行 sing-box 的下载、解包和补丁应用，不编译 Go；补丁失败在分钟级暴露。
+          if ! make package/sing-box/prepare -j1 V=s 2>&1 | tee "$GITHUB_WORKSPACE/build-reports/preflight-sing-box-prepare.log"; then
+            echo "preflight-sing-box-prepare-failed"
+            exit 1
+          fi
+          echo "preflight-sing-box-prepare: passed"
 
       - name: Preflight Build Dependencies
         if: ${{ !inputs.WRT_TEST }}
