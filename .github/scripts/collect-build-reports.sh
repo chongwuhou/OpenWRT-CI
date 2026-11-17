@@ -7,6 +7,13 @@ set -euo pipefail
 REPORT_DIR="${GITHUB_WORKSPACE:-$PWD}/build-reports"
 mkdir -p "$REPORT_DIR"
 
+# BUILD_LOG=1 将每个包的详细编译输出写入 ./logs；即使最终构建失败，
+# 也要把现场一并带进 artifact，避免只剩下 make 的摘要错误。
+if [ -d ./logs ]; then
+	mkdir -p "$REPORT_DIR/wrt-logs"
+	cp -a ./logs/. "$REPORT_DIR/wrt-logs/"
+fi
+
 git rev-parse HEAD > "$REPORT_DIR/source-commit.txt"
 if [ -f .config ]; then
 	cp .config "$REPORT_DIR/config.txt"

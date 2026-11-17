@@ -133,10 +133,51 @@ fi
 # luci-app-dockerman 也沿用 v0.5.26；APK 版本字段必须使用无 v 前缀的规范版本。
 DOCKERMAN_MAKE="$PACKAGE_PATH/luci-app-dockerman/Makefile"
 if [ -f "$DOCKERMAN_MAKE" ] && grep -q '^PKG_VERSION:=v' "$DOCKERMAN_MAKE"; then
-	FIX "luci-app-dockerman-apk-version" "$PACKAGE_PATH/luci-app-dockerman" sed -i \\
-		's/^PKG_VERSION:=v/PKG_VERSION:=/' \\
+	FIX "luci-app-dockerman-apk-version" "$PACKAGE_PATH/luci-app-dockerman" sed -i \
+		's/^PKG_VERSION:=v/PKG_VERSION:=/' \
 		"$DOCKERMAN_MAKE"
 fi
+# mihomo 的 EIP93 overlay 只服务 Airoha AN7581；S20P 是 MediaTek Filogic，
+# 不应让这段针对另一种 SoC 的 arm64 专用补丁进入本次构建。只在 S20P
+# 配置下移除整个条件块，保留标准 with_gvisor 和 UPX 构建逻辑。
+MIHOMO_MAKE="$PACKAGE_PATH/mihomo/Makefile"
+PATCH_MIHOMO_NO_EIP93() {
+	local MAKEFILE=$1
+	local TMPFILE="${MAKEFILE}.tmp"
+	awk '
+		BEGIN { skip = 0; depth = 0; found = 0 }
+		!skip && /^ifeq[[:space:]]+\(\$\(GO_ARCH\),arm64\)[[:space:]]*$/ {
+			skip = 1
+			depth = 1
+			found = 1
+			next
+		}
+		skip {
+			if ($0 ~ /^(ifeq|ifneq|ifdef|ifndef)[[:space:]]/) depth++
+			if ($0 ~ /^endif([[:space:]]|$)/) {
+				depth--
+				if (depth == 0) skip = 0
+			}
+			next
+		}
+		{ print }
+		END { if (!found || skip != 0) exit 1 }
+	' "$MAKEFILE" > "$TMPFILE" && mv "$TMPFILE" "$MAKEFILE"
+}
+if [[ "${WRT_CONFIG:-}" == S20P* ]]; then
+	if [ ! -f "$MIHOMO_MAKE" ]; then
+		echo "required S20P mihomo Makefile missing: $MIHOMO_MAKE"
+		exit 1
+	fi
+	if grep -Eqi 'eip93|^ifeq[[:space:]]+\(\$\(GO_ARCH\),arm64\)' "$MIHOMO_MAKE"; then
+		FIX "mihomo-s20p-no-eip93" "$PACKAGE_PATH/mihomo" PATCH_MIHOMO_NO_EIP93 "$MIHOMO_MAKE"
+	fi
+	if grep -Eqi 'eip93|^ifeq[[:space:]]+\(\$\(GO_ARCH\),arm64\)' "$MIHOMO_MAKE"; then
+		echo "mihomo S20P EIP93 overlay removal assertion failed"
+		exit 1
+	fi
+fi
+
 # nps-openwrt 当前 main 将预编译包版本占位为 null；这会生成无效下载/打包元数据。
 # 固定到官方最新发布，并同步 S20P aarch64 的 client/server 校验值。
 NPS_VERSION="0.35.3"
@@ -162,3 +203,18 @@ if [ -f "$DOCKER_INIT" ] && grep -q $'^\tuciadd$' "$DOCKER_INIT"; then
 		'/^boot() {/,/^}/ s/^[[:space:]]*uciadd$/	if ! uci_quiet get network.docker || ! uci_quiet get firewall.docker; then\n		uciadd\n	fi/' \
 		"$DOCKER_INIT"
 fi
+
+# S20P 的关键修补必须在 Custom Packages 阶段失败即止，不能把错误拖到数小时后的 APK 打包阶段。
+if [[ "${WRT_CONFIG:-}" == S20P* ]]; then
+	for MAKEFILE in "$DOCKER_LIB_MAKE" "$DOCKERMAN_MAKE"; do
+		if [ ! -f "$MAKEFILE" ]; then
+			echo "required S20P Docker Makefile missing: $MAKEFILE"
+			exit 1
+		fi
+		if grep -q '^PKG_VERSION:=v' "$MAKEFILE"; then
+			echo "S20P Docker APK version normalization assertion failed: $MAKEFILE"
+			exit 1
+		fi
+	done
+fi
+

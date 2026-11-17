@@ -252,7 +252,7 @@ jobs:
             [ -n "$WARNING" ] || continue
             MAKEFILE=$(sed -n "s/^WARNING: Makefile '\\([^']*\\)'.*/\\1/p" <<< "$WARNING")
             PKG_NAME=$(sed -n 's/^PKG_NAME:=//p' "$MAKEFILE" 2>/dev/null | head -n 1)
-            if [ -n "$PKG_NAME" ] && grep -q "^CONFIG_PACKAGE_$PKG_NAME=y" .config; then
+            if [ -n "$PKG_NAME" ] && grep -Eq "^CONFIG_PACKAGE_${PKG_NAME}=(y|m)$" .config; then
               echo "$WARNING"
               SELECTED_DEPENDENCY_WARNINGS=1
             fi
@@ -288,7 +288,7 @@ jobs:
             PKG_NAME=$(sed -n 's/^PKG_NAME:=//p' "$MAKEFILE" | head -n 1)
             [ -n "$PKG_NAME" ] || continue
             PKG_VERSION=$(sed -n 's/^PKG_VERSION:=//p' "$MAKEFILE" | head -n 1)
-            if grep -q "^CONFIG_PACKAGE_$PKG_NAME=y" .config && [ -n "$PKG_VERSION" ]; then
+            if grep -Eq "^CONFIG_PACKAGE_${PKG_NAME}=(y|m)$" .config && [ -n "$PKG_VERSION" ]; then
               case "$PKG_VERSION" in
                 [0-9]*) ;;
                 v*|V*|null|NULL|undefined|UNDEFINED)
@@ -392,9 +392,44 @@ jobs:
         run: |
           cd ./wrt/
 
-          mkdir -p $GITHUB_WORKSPACE/build-reports
-          make -j$(nproc) BUILD_TIME_LOG="$GITHUB_WORKSPACE/build-reports/parallel.tsv" || \
-            make -j1 V=s BUILD_TIME_LOG="$GITHUB_WORKSPACE/build-reports/serial.tsv"
+          set -o pipefail
+          LOG_DIR="$GITHUB_WORKSPACE/build-reports"
+          mkdir -p "$LOG_DIR"
+
+          set +e
+          make -j$(nproc) BUILD_LOG=1 BUILD_TIME_LOG="$LOG_DIR/parallel.tsv" 2>&1 | \
+            tee "$LOG_DIR/compile-parallel.log"
+          PARALLEL_STATUS=${PIPESTATUS[0]}
+          set -e
+
+          if [ "$PARALLEL_STATUS" -eq 0 ]; then
+            exit 0
+          fi
+
+          mapfile -t FAILED_PACKAGES < <(
+            sed -n 's/.*ERROR: \(package\/[^ ]*\) failed to build.*/\1/p' \
+              "$LOG_DIR/compile-parallel.log" | tr -d '\r' | sort -u
+          )
+          if [ "${#FAILED_PACKAGES[@]}" -eq 0 ]; then
+            echo "parallel build failed without a package-level error; preserve the full log and stop"
+            exit "$PARALLEL_STATUS"
+          fi
+
+          for PKG in "${FAILED_PACKAGES[@]}"; do
+            SAFE_PKG=$(printf '%s' "$PKG" | tr '/' '_')
+            set +e
+            make -j1 V=s BUILD_LOG=1 "$PKG/compile" 2>&1 | \
+              tee "$LOG_DIR/failed-${SAFE_PKG}.log"
+            PACKAGE_STATUS=${PIPESTATUS[0]}
+            set -e
+            if [ "$PACKAGE_STATUS" -ne 0 ]; then
+              echo "single-package diagnostic failed: $PKG"
+              exit "$PACKAGE_STATUS"
+            fi
+          done
+
+          make -j1 V=s BUILD_LOG=1 BUILD_TIME_LOG="$LOG_DIR/serial.tsv" 2>&1 | \
+            tee "$LOG_DIR/compile-serial.log"
 
       - name: Audit Built Firmware
         if: ${{ !inputs.WRT_TEST && success() }}
@@ -440,7 +475,8 @@ jobs:
           retention-days: 7
 
       - name: Save Build Cache
-        if: ${{ !inputs.WRT_TEST && success() && steps.cache-restore.outputs.cache-hit != 'true' }}
+        if: ${{ !inputs.WRT_TEST && always() && !cancelled() && steps.cache-restore.outputs.cache-hit != 'true' }}
+        continue-on-error: true
         uses: actions/cache/save@v4
         with:
           key: ${{env.WRT_CACHE_KEY}}
