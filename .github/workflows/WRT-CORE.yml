@@ -176,6 +176,8 @@ jobs:
         run: |
           cd ./wrt/
 
+          bash -n "$GITHUB_WORKSPACE/Scripts/Packages.sh"
+          bash -n "$GITHUB_WORKSPACE/Scripts/Handles.sh"
           $GITHUB_WORKSPACE/Scripts/Packages.sh
           $GITHUB_WORKSPACE/Scripts/Handles.sh
           $GITHUB_WORKSPACE/.github/scripts/prepare-i2c-tools.sh
@@ -194,21 +196,45 @@ jobs:
           $GITHUB_WORKSPACE/Scripts/Settings.sh
           $GITHUB_WORKSPACE/.github/scripts/prepare-build-host.sh
 
-          # Packages.sh 已将 VIKINGYFY/packages 的 sing-box 作为唯一主包放入 package/sing-box。
-          # 这里仅验证唯一规范入口，不再在 defconfig 前复制、提升、删除源码，避免误伤 feeds/base 链接。
-          SING_BOX_MAIN="./package/sing-box"
-          if [ ! -f "$SING_BOX_MAIN/Makefile" ]; then
-            echo "sing-box-source-not-found: $SING_BOX_MAIN/Makefile"
+          # sing-box 使用 ImmortalWrt 官方 packages feed：该包自带完整的
+          # Naive outbound 配置和已验证的 system-libcronet 补丁，不在 CI 中动态改第三方源码。
+          SING_BOX_MAIN=""
+          for CANDIDATE in ./feeds/packages/net/sing-box ./package/feeds/packages/sing-box ./package/sing-box; do
+            if [ -f "$CANDIDATE/Makefile" ]; then
+              SING_BOX_MAIN="$CANDIDATE"
+              break
+            fi
+          done
+          if [ -z "$SING_BOX_MAIN" ]; then
+            echo "sing-box-official-source-not-found"
             exit 1
           fi
-          if [ "$(find -L "$SING_BOX_MAIN" -maxdepth 1 -type f -name Makefile -print | wc -l)" -ne 1 ]; then
-            echo "sing-box-main-makefile-invalid"
+          if [ -e ./package/sing-box/Makefile ] && [ "$SING_BOX_MAIN" != "./package/sing-box" ]; then
+            echo "unexpected-custom-sing-box-source: ./package/sing-box"
             exit 1
           fi
-          echo "sing-box canonical source: $SING_BOX_MAIN/Makefile"
-          # .config 中写成 y 不能证明包一定被 OpenWrt 注册；先逐项检查 Makefile 和 Package 定义。
+          SING_BOX_PATCH="$SING_BOX_MAIN/patches/100-use-system-libcronet.patch"
+          if [ ! -s "$SING_BOX_PATCH" ]; then
+            echo "sing-box-official-libcronet-patch-missing: $SING_BOX_PATCH"
+            exit 1
+          fi
+          if ! grep -q '^@@ -9,7 +9,6 @@ import (' "$SING_BOX_PATCH" || ! grep -q 'common/dialer' "$SING_BOX_PATCH"; then
+            echo "sing-box-official-libcronet-patch-incomplete: $SING_BOX_PATCH"
+            exit 1
+          fi
+          echo "sing-box official source: $SING_BOX_MAIN/Makefile"
+          if ! grep -q 'with_naive_outbound' "$SING_BOX_MAIN/Makefile"; then
+            echo "sing-box-naive-outbound-support-missing"
+            exit 1
+          fi
+          if ! grep -q '^CONFIG_SING_BOX_BUILD_NAIVE_OUTBOUND=y' .config; then
+            echo "sing-box-naive-outbound-config-missing"
+            exit 1
+          fi
+          # .config 中写成 y 不能证明包一定被 OpenWrt 注册；
+先逐项检查 Makefile 和 Package 定义。
           for REQUIRED_SPEC in \
-            "sing-box:./package/sing-box/Makefile" \
+            "sing-box:$SING_BOX_MAIN/Makefile" \
             "naiveproxy:./package/naiveproxy/Makefile" \
             "mihomo:./package/mihomo/Makefile" \
             "luci-app-passwall:./package/luci-app-passwall/Makefile" \
@@ -321,6 +347,19 @@ jobs:
           done
           echo "preflight-package-metadata-audit: passed"
 
+      - name: Preflight sing-box source patch
+        if: ${{ !inputs.WRT_TEST }}
+        run: |
+          cd ./wrt/
+          set -o pipefail
+          mkdir -p "$GITHUB_WORKSPACE/build-reports"
+          # 只执行 sing-box 的下载、解包和补丁应用，不编译 Go；补丁失败在分钟级暴露。
+          if ! make package/sing-box/prepare -j1 V=s 2>&1 | tee "$GITHUB_WORKSPACE/build-reports/preflight-sing-box-prepare.log"; then
+            echo "preflight-sing-box-prepare-failed"
+            exit 1
+          fi
+          echo "preflight-sing-box-prepare: passed"
+
       - name: Prepare Rust Toolchain
         if: ${{ !inputs.WRT_TEST }}
         run: |
@@ -384,6 +423,20 @@ jobs:
             make "$@" -j$(nproc) V=s 2>&1 | tee "$GITHUB_WORKSPACE/build-reports/preflight-$NAME.log"
           }
           run_make tools-compile tools/compile
+
+          # mihomo 的上游 Makefile 使用 STAGING_DIR_HOST/bin/upx，
+          # ImmortalWrt 的 upx/host 实际安装在 hostpkg/bin；建立兼容入口，
+          # 不改 mihomo 第三方源码，也不生成临时补丁。
+          mkdir -p staging_dir/host/bin
+          if [ ! -e staging_dir/host/bin/upx ] && [ ! -L staging_dir/host/bin/upx ]; then
+            ln -s ../hostpkg/bin/upx staging_dir/host/bin/upx
+          fi
+          if [ -e staging_dir/host/bin/upx ] || [ -L staging_dir/host/bin/upx ]; then
+            echo "mihomo UPX compatibility path: staging_dir/host/bin/upx"
+          else
+            echo "mihomo UPX compatibility path creation failed"
+            exit 1
+          fi
           run_make toolchain-compile toolchain/compile
           run_make target-compile target/compile
 

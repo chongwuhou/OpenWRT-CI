@@ -45,43 +45,6 @@ FIX "mini-diskmanager" "$PACKAGE_PATH/luci-app-mini-diskmanager" sed -i "s/servi
 FIX "natmapt" "$PACKAGE_PATH/luci-app-natmapt" sed -i "s/network/services/g" \
 	"$PACKAGE_PATH/luci-app-natmapt/root/usr/share/luci/menu.d/luci-app-natmap.json"
 
-# sing-box 完整版补齐 Naive outbound：VIKINGYFY 配套包默认未启用该构建标签。
-# 使用 ImmortalWrt 的系统 libcronet，避免依赖内置平台库；PassWall 才会显示 sing-box/Naive 协议。
-SING_BOX_DIR="$PACKAGE_PATH/sing-box"
-SING_BOX_MAKE="$SING_BOX_DIR/Makefile"
-if [ ! -f "$SING_BOX_MAKE" ] && [ -f "$FEEDS_PATH/base/sing-box/Makefile" ]; then
-	SING_BOX_DIR="$FEEDS_PATH/base/sing-box"
-	SING_BOX_MAKE="$SING_BOX_DIR/Makefile"
-fi
-if [ -f "$SING_BOX_MAKE" ] && grep -q '^  GO_PKG_TAGS:=http2legacy,' "$SING_BOX_MAKE" && ! grep -q 'with_naive_outbound' "$SING_BOX_MAKE"; then
-	FIX "sing-box-naive-dep" "$SING_BOX_DIR" sed -i \
-		's|^  DEPENDS+= +kmod-netlink-diag +kmod-tun$|  DEPENDS+= +kmod-netlink-diag +kmod-tun +libcronet|' \
-		"$SING_BOX_MAKE"
-	FIX "sing-box-checklinkname" "$SING_BOX_DIR" sed -i \
-		'/^GO_PKG_LDFLAGS_X:=/i GO_PKG_LDFLAGS:=-checklinkname=0' \
-		"$SING_BOX_MAKE"
-	FIX "sing-box-naive-tag" "$SING_BOX_DIR" sed -i \
-		's|^  GO_PKG_TAGS:=http2legacy,with_acme,with_clash_api,with_dhcp,with_gvisor,with_quic,with_tailscale,with_utls,with_wireguard$|  GO_PKG_TAGS:=http2legacy,with_acme,with_clash_api,with_dhcp,with_gvisor,with_naive_outbound,with_quic,with_tailscale,with_utls,with_wireguard|' \
-		"$SING_BOX_MAKE"
-	if ! grep -q 'TARGET_LDFLAGS += -lcronet' "$SING_BOX_MAKE"; then
-		# 以完整三行条件块插入，避免 sed 多次插入导致孤立 endif 使 Makefile 无法注册包。
-		FIX "sing-box-naive-link" "$SING_BOX_DIR" sed -i '/^define Package\/sing-box\/conffiles/i\
-ifneq ($(findstring with_naive_outbound,$(GO_PKG_TAGS)),)\
-  TARGET_LDFLAGS += -lcronet\
-endif' "$SING_BOX_MAKE"
-	fi
-	mkdir -p "$SING_BOX_DIR/patches"
-	if [ ! -f "$SING_BOX_DIR/patches/100-use-system-libcronet.patch" ]; then
-		printf '%s\n' \
-			'--- a/protocol/naive/outbound.go' \
-			'+++ b/protocol/naive/outbound.go' \
-			'@@ -9,7 +9,6 @@ import (' \
-			$'\t"github.com/sagernet/cronet-go"' \
-			$'-\t_ "github.com/sagernet/cronet-go/all"' \
-			$'\t"github.com/sagernet/sing-box/adapter"' \
-			> "$SING_BOX_DIR/patches/100-use-system-libcronet.patch"
-	fi
-fi
 # OpenAppFilter：Linux 6.18 将 del_timer_sync() 更名为 timer_delete_sync()。
 # 同时补入 timer.h，并递归处理实际复制后的源码路径。
 while IFS= read -r OAF_SRC; do
@@ -137,63 +100,6 @@ if [ -f "$DOCKERMAN_MAKE" ] && grep -q '^PKG_VERSION:=v' "$DOCKERMAN_MAKE"; then
 		's/^PKG_VERSION:=v/PKG_VERSION:=/' \
 		"$DOCKERMAN_MAKE"
 fi
-# mihomo 的 EIP93 overlay 只服务 Airoha AN7581；S20P 是 MediaTek Filogic，
-# 不应让这段针对另一种 SoC 的 arm64 专用补丁进入本次构建。只在 S20P
-# 配置下移除整个条件块，保留标准 with_gvisor 和 UPX 构建逻辑。
-MIHOMO_MAKE="$PACKAGE_PATH/mihomo/Makefile"
-PATCH_MIHOMO_NO_EIP93() {
-	local MAKEFILE=$1
-	local TMPFILE="${MAKEFILE}.tmp"
-	awk '
-		BEGIN { skip = 0; depth = 0; found = 0 }
-		!skip && /^ifeq[[:space:]]+\(\$\(GO_ARCH\),arm64\)[[:space:]]*$/ {
-			skip = 1
-			depth = 1
-			found = 1
-			next
-		}
-		skip {
-			if ($0 ~ /^(ifeq|ifneq|ifdef|ifndef)[[:space:]]/) depth++
-			if ($0 ~ /^endif([[:space:]]|$)/) {
-				depth--
-				if (depth == 0) skip = 0
-			}
-			next
-		}
-		{ print }
-		END { if (!found || skip != 0) exit 1 }
-	' "$MAKEFILE" > "$TMPFILE" && mv "$TMPFILE" "$MAKEFILE"
-}
-# ImmortalWrt 的 upx/host 在 package 构建上下文中安装到 hostpkg/bin，
-# mihomo 上游 Makefile 使用 STAGING_DIR_HOST 会在 UPX 压缩阶段找不到文件。
-if [ -f "$MIHOMO_MAKE" ] && grep -qF '$(STAGING_DIR_HOST)/bin/upx' "$MIHOMO_MAKE"; then
-	FIX "mihomo-upx-hostpkg-path" "$PACKAGE_PATH/mihomo" sed -i \
-		's|\$(STAGING_DIR_HOST)/bin/upx|\$(STAGING_DIR_HOSTPKG)/bin/upx|g' \
-		"$MIHOMO_MAKE"
-fi
-
-if [[ "${WRT_CONFIG:-}" == S20P* ]]; then
-	if [ ! -f "$MIHOMO_MAKE" ]; then
-		echo "required S20P mihomo Makefile missing: $MIHOMO_MAKE"
-		exit 1
-	fi
-	if grep -Eqi 'eip93|^ifeq[[:space:]]+\(\$\(GO_ARCH\),arm64\)' "$MIHOMO_MAKE"; then
-		FIX "mihomo-s20p-no-eip93" "$PACKAGE_PATH/mihomo" PATCH_MIHOMO_NO_EIP93 "$MIHOMO_MAKE"
-	fi
-	if grep -Eqi 'eip93|^ifeq[[:space:]]+\(\$\(GO_ARCH\),arm64\)' "$MIHOMO_MAKE"; then
-		echo "mihomo S20P EIP93 overlay removal assertion failed"
-		exit 1
-	fi
-	if grep -qF '$(STAGING_DIR_HOST)/bin/upx' "$MIHOMO_MAKE"; then
-		echo "mihomo UPX path assertion failed: still references STAGING_DIR_HOST"
-		exit 1
-	fi
-	if ! grep -qF '$(STAGING_DIR_HOSTPKG)/bin/upx' "$MIHOMO_MAKE"; then
-		echo "mihomo UPX path assertion failed: missing STAGING_DIR_HOSTPKG"
-		exit 1
-	fi
-fi
-
 # nps-openwrt 当前 main 将预编译包版本占位为 null；这会生成无效下载/打包元数据。
 # 固定到官方最新发布，并同步 S20P aarch64 的 client/server 校验值。
 NPS_VERSION="0.35.3"

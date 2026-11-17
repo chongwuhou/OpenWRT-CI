@@ -118,8 +118,8 @@ UPDATE_PACKAGE "luci-app-dockerman" "lisaac/luci-app-dockerman" "master" "pkg"
 UPDATE_PACKAGE "diskmanager" "4IceG/luci-app-mini-diskmanager" "main"
 UPDATE_PACKAGE "easytier" "EasyTier/luci-app-easytier" "main"
 UPDATE_PACKAGE "qmodem" "FUjr/QModem" "main"
-# VIKINGYFY 配套包：显式清理同名 feeds 后逐包复制，确保 sing-box 全量版和配套 LuCI 使用该仓库版本。
-UPDATE_PACKAGE "luci-app-homeproxy" "VIKINGYFY/packages" "main" "pkg" "axonhub gecoosac miniupnpd sing-box luci-app-timewol luci-app-upnp luci-app-wolplus luci-app-wolultra"
+# VIKINGYFY 配套包：显式清理同名 feeds 后逐包复制，保留其 LuCI 与辅助服务包；sing-box 使用 ImmortalWrt 官方包。
+UPDATE_PACKAGE "luci-app-homeproxy" "VIKINGYFY/packages" "main" "pkg" "axonhub gecoosac miniupnpd luci-app-timewol luci-app-upnp luci-app-wolplus luci-app-wolultra"
 
 UPDATE_PACKAGE "diskman" "sbwml/luci-app-diskman" "main"
 UPDATE_PACKAGE "mosdns" "sbwml/luci-app-mosdns" "v5" "" "v2dat"
