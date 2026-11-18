@@ -186,7 +186,7 @@ NORMALIZE_SING_BOX() {
 				dep_added = 1
 				next
 			}
-			/^  DEPENDS+=/ && /kmod-tun/ && add_package_depends && !/SING_BOX_BUILD_NAIVE_OUTBOUND/ {
+			/^  DEPENDS\+=/ && /kmod-tun/ && add_package_depends && !/SING_BOX_BUILD_NAIVE_OUTBOUND/ {
 				print $0 " +SING_BOX_BUILD_NAIVE_OUTBOUND:libcronet"
 				next
 			}
@@ -309,4 +309,5 @@ if [[ "${WRT_CONFIG:-}" == S20P* ]]; then
 		exit 1
 	fi
 fi
+
 
