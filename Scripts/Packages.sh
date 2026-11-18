@@ -2,27 +2,28 @@
 # SPDX-License-Identifier: MIT
 # Copyright (C) 2026 VIKINGYFY
 
-#安装和更新软件包
+set -euo pipefail
+
+# Stage third-party package sources with one explicit precedence rule.
+# The optional sixth argument locks a branch/tag to an exact commit.
 UPDATE_PACKAGE() {
 	local PKG_NAME=$1
 	local PKG_REPO=$2
 	local PKG_BRANCH=$3
-	local PKG_SPECIAL=$4
-	local PKG_LIST=("$PKG_NAME" $5)  # 第5个参数为自定义名称列表
+	local PKG_SPECIAL=${4:-}
+	local EXTRA_PACKAGES=${5:-}
+	local PKG_COMMIT=${6:-}
+	local PKG_LIST=("$PKG_NAME" $EXTRA_PACKAGES)
 	local REPO_NAME=${PKG_REPO#*/}
 	local REPO_PATH="./tmp/package-sources/$REPO_NAME"
 
-	echo " "
-
-	# 删除本地可能存在的不同名称的软件包
 	for NAME in "${PKG_LIST[@]}"; do
-		# 查找 feed 源目录以及 feeds install -a 留下的旧链接/目录。
-		# 同名旧链接会让自定义包（尤其是 sing-box）在 make defconfig 时被忽略。
 		echo "Search directory: $NAME"
-		local FOUND_DIRS=$(find ./feeds/base/ ./feeds/luci/ ./feeds/packages/ ./package/feeds/base/ ./package/feeds/luci/ ./package/feeds/packages/ \
-			-maxdepth 4 \( -type d -o -type l \) -iname "*$NAME*" 2>/dev/null)
+		local FOUND_DIRS
+		FOUND_DIRS=$(find ./feeds/base/ ./feeds/luci/ ./feeds/packages/ \
+			./package/feeds/base/ ./package/feeds/luci/ ./package/feeds/packages/ \
+			-maxdepth 4 \( -type d -o -type l \) -iname "*$NAME*" 2>/dev/null || true)
 
-		# 删除找到的目录或链接
 		if [ -n "$FOUND_DIRS" ]; then
 			while IFS= read -r DIR; do
 				[ -n "$DIR" ] || continue
@@ -30,58 +31,65 @@ UPDATE_PACKAGE() {
 				echo "Delete directory: $DIR"
 			done <<< "$FOUND_DIRS"
 		else
-			echo "Not fonud directory: $NAME"
+			echo "No existing directory: $NAME"
 		fi
-	if [ "$NAME" = "sing-box" ]; then
-		for DIR in ./package/sing-box ./feeds/base/sing-box ./feeds/base/feeds/packages/sing-box ./package/feeds/base/sing-box ./feeds/packages/net/sing-box ./package/feeds/packages/sing-box; do
-			if [ -e "$DIR" ] || [ -L "$DIR" ]; then
-				rm -rf "$DIR"
-				echo "Delete duplicate sing-box: $DIR"
-			fi
-		done
-	fi
+
+		if [ "$NAME" = "sing-box" ]; then
+			for DIR in \
+				./package/sing-box \
+				./feeds/base/sing-box \
+				./feeds/base/feeds/packages/sing-box \
+				./package/feeds/base/sing-box \
+				./feeds/packages/net/sing-box \
+				./feeds/packages/sing-box; do
+				if [ -e "$DIR" ] || [ -L "$DIR" ]; then
+					rm -rf "$DIR"
+					echo "Delete duplicate sing-box: $DIR"
+				fi
+			done
+		fi
 	done
 
-	# 克隆 GitHub 仓库
-	mkdir -p "./tmp/package-sources"
+	mkdir -p ./tmp/package-sources
 	rm -rf "$REPO_PATH"
-	git clone --depth=1 --single-branch --branch $PKG_BRANCH "https://github.com/$PKG_REPO.git" $REPO_PATH
+	git clone --depth=1 --single-branch --branch "$PKG_BRANCH" \
+		"https://github.com/$PKG_REPO.git" "$REPO_PATH"
+	if [ -n "$PKG_COMMIT" ]; then
+		ACTUAL_COMMIT=$(git -C "$REPO_PATH" rev-parse HEAD)
+		if [ "$ACTUAL_COMMIT" != "$PKG_COMMIT" ]; then
+			echo "source-ref-drift: $PKG_REPO@$PKG_BRANCH expected $PKG_COMMIT got $ACTUAL_COMMIT" >&2
+			exit 1
+		fi
+	fi
 
-	# 处理克隆的仓库
 	if [[ "$PKG_SPECIAL" == "pkg" ]]; then
-		# 主包和第5个参数列出的附属包都要复制，避免只得到 LuCI 界面而漏掉运行依赖。
 		for NAME in "${PKG_LIST[@]}"; do
-			# sing-box 不能依赖 find 的目录匹配：明确复制 VIKINGYFY 的完整包，避免 feed 冲突清理后包源消失。
-			if [ "$NAME" = "sing-box" ] && [ -f "$REPO_PATH/sing-box/Makefile" ]; then
-				# 直接放入 package/，这是 OpenWrt 主构建树会扫描的路径；不再放入 feeds/base。
-				rm -rf "./package/sing-box" "./feeds/base/sing-box"
-				cp -rf "$REPO_PATH/sing-box" "./package/sing-box"
+			if [ "$NAME" = "sing-box" ]; then
+				[ -f "$REPO_PATH/sing-box/Makefile" ] || {
+					echo "required VIKINGYFY sing-box package is missing" >&2
+					exit 1
+				}
+				rm -rf ./package/sing-box ./feeds/base/sing-box
+				cp -rf "$REPO_PATH/sing-box" ./package/sing-box
 				echo "Install VIKINGYFY sing-box: ./package/sing-box"
-			# 兼容“仓库根目录就是一个包”的独立仓库，也兼容多包大杂烩仓库。
 			elif [ -f "$REPO_PATH/Makefile" ] && grep -q "define Package/$NAME" "$REPO_PATH/Makefile"; then
-				# 独立仓库的根目录就是包本体，复制到 OpenWrt 的 package/ 目录。
 				rm -rf "./package/$NAME"
 				cp -rf "$REPO_PATH" "./package/$NAME"
 			else
-				# 先删除同名目标，避免 cp 将包复制成 package/<name>/<name> 或落入旧链接。
 				rm -rf "./package/$NAME"
-				find "$REPO_PATH" -mindepth 1 -maxdepth 4 -type d -iname "*$NAME*" -prune -exec cp -rf {} ./package \;
+				find "$REPO_PATH" -mindepth 1 -maxdepth 4 -type d \
+					-iname "*$NAME*" -prune -exec cp -rf {} ./package \;
 			fi
 		done
 		rm -rf "$REPO_PATH"
 	else
-		# 非 pkg 模式保留整个仓库，维持原脚本对主题和完整软件源的用法。
 		rm -rf "./package/$REPO_NAME"
 		cp -rf "$REPO_PATH" "./package/$REPO_NAME"
 		rm -rf "$REPO_PATH"
 	fi
 }
 
-# 调用示例
-# UPDATE_PACKAGE "OpenAppFilter" "destan19/OpenAppFilter" "master" "" "custom_name1 custom_name2"
-# UPDATE_PACKAGE "open-app-filter" "destan19/OpenAppFilter" "master" "" "luci-app-appfilter oaf" 这样会把原有的open-app-filter，luci-app-appfilter，oaf相关组件删除，不会出现coremark错误。
-
-# UPDATE_PACKAGE "包名" "项目地址" "项目分支" "pkg，可选，从大杂烩中单独提取包名插件"
+# Themes and UI components.
 UPDATE_PACKAGE "argon" "sbwml/luci-theme-argon" "openwrt-25.12"
 UPDATE_PACKAGE "aurora" "eamonxg/luci-theme-aurora" "master"
 UPDATE_PACKAGE "aurora-config" "eamonxg/luci-app-aurora-config" "master"
@@ -92,40 +100,41 @@ UPDATE_PACKAGE "kucat-config" "sirpdboy/luci-app-kucat-config" "master"
 UPDATE_PACKAGE "shadcn" "eamonxg/luci-theme-shadcn" "main"
 UPDATE_PACKAGE "vantage" "anothaDev/luci-theme-vantage" "main"
 
+# Proxy cores and front ends.
 UPDATE_PACKAGE "momo" "nikkinikki-org/OpenWrt-momo" "main"
 UPDATE_PACKAGE "nikki" "nikkinikki-org/OpenWrt-nikki" "main"
-UPDATE_PACKAGE "openclash" "vernesong/OpenClash" "dev" "pkg"
-UPDATE_PACKAGE "luci-app-ssr-plus" "fw876/helloworld" "v198.3" "pkg" "mihomo"
-UPDATE_PACKAGE "dns2socks-rust" "fw876/helloworld" "v198.3" "pkg"
-# NaiveProxy 使用 PassWall 官方配套仓库的 OpenWrt 预编译包，避免 Chromium 源码构建造成超长等待和架构兼容风险。
-UPDATE_PACKAGE "naiveproxy" "Openwrt-Passwall/openwrt-passwall-packages" "main" "pkg" "shadowsocksr-libev"
-# 独立包仓库，包名明确为 kcptun-client，避免从大杂烩仓库复制到错误目录。
-UPDATE_PACKAGE "kcptun-client" "permails/kcptun-client" "main" "pkg"
-UPDATE_PACKAGE "luci-app-passwall" "Openwrt-Passwall/openwrt-passwall" "main" "pkg"
-UPDATE_PACKAGE "luci-app-passwall2" "Openwrt-Passwall/openwrt-passwall2" "main" "pkg"
+UPDATE_PACKAGE "openclash" "vernesong/OpenClash" "dev" "pkg" "" "9e16fae39fac577a8f4c72be35a3fd3c3faeec4d"
+UPDATE_PACKAGE "luci-app-ssr-plus" "fw876/helloworld" "v198.3" "pkg" "mihomo" "81c6320d40d455e6d623b6579f460d0665e1a421"
+UPDATE_PACKAGE "dns2socks-rust" "fw876/helloworld" "v198.3" "pkg" "" "81c6320d40d455e6d623b6579f460d0665e1a421"
+UPDATE_PACKAGE "naiveproxy" "Openwrt-Passwall/openwrt-passwall-packages" "main" "pkg" "shadowsocksr-libev" "8147e8bf8abc62b5357f76defa37f380e35f6e0a"
+UPDATE_PACKAGE "kcptun-client" "permails/kcptun-client" "main" "pkg" "" "83fcdc81f31a43d496c9b24698b0b62c6fcf5cc4"
+UPDATE_PACKAGE "luci-app-passwall" "Openwrt-Passwall/openwrt-passwall" "main" "pkg" "" "4cca0dc9985d176733fe50c352c4163675af01fd"
+UPDATE_PACKAGE "luci-app-passwall2" "Openwrt-Passwall/openwrt-passwall2" "main" "pkg" "" "fbe2b6beac461bfaed6fd236ba2dde1230b94918"
 
-# S20P 参考固件中的应用与管理组件
-UPDATE_PACKAGE "luci-app-store" "linkease/istore" "main" "pkg" "luci-lib-taskd luci-lib-xterm taskd"
+# iStore and service components.
+UPDATE_PACKAGE "luci-app-store" "linkease/istore" "main" "pkg" "luci-lib-taskd luci-lib-xterm taskd" "a97ace34f2da358a015b094d326bba2697697f2e"
 UPDATE_PACKAGE "ddnsto" "linkease/nas-packages" "master" "pkg"
 UPDATE_PACKAGE "luci-app-ddnsto" "linkease/nas-packages-luci" "main" "pkg"
 UPDATE_PACKAGE "luci-app-oaf" "OpenWrt-Actions/OpenAppFilter" "master" "pkg" "appfilter oaf"
 UPDATE_PACKAGE "luci-app-nps" "djylb/nps-openwrt" "main" "pkg" "npc nps"
 
-# Docker 管理界面；运行时由 ImmortalWrt packages 提供 dockerd/docker/compose
-UPDATE_PACKAGE "luci-lib-docker" "lisaac/luci-lib-docker" "master" "pkg"
-UPDATE_PACKAGE "luci-app-dockerman" "lisaac/luci-app-dockerman" "master" "pkg"
+# Docker management UI; runtime packages come from the ImmortalWrt feed.
+UPDATE_PACKAGE "luci-lib-docker" "lisaac/luci-lib-docker" "master" "pkg" "" "98a663449208b65e68702ad0f3ad61c536bfa40c"
+UPDATE_PACKAGE "luci-app-dockerman" "lisaac/luci-app-dockerman" "master" "pkg" "" "6fd9937954e0b080bf07967182d714ea21fe7eb1"
 
+# Storage, modem, and utility components.
 UPDATE_PACKAGE "diskmanager" "4IceG/luci-app-mini-diskmanager" "main"
 UPDATE_PACKAGE "easytier" "EasyTier/luci-app-easytier" "main"
 UPDATE_PACKAGE "qmodem" "FUjr/QModem" "main"
-# VIKINGYFY 配套包：显式清理同名 feeds 后逐包复制，保留其 LuCI 与辅助服务包；sing-box 使用 ImmortalWrt 官方包。
-UPDATE_PACKAGE "luci-app-homeproxy" "VIKINGYFY/packages" "main" "pkg" "axonhub gecoosac miniupnpd luci-app-timewol luci-app-upnp luci-app-wolplus luci-app-wolultra"
-
 UPDATE_PACKAGE "diskman" "sbwml/luci-app-diskman" "main"
 UPDATE_PACKAGE "mosdns" "sbwml/luci-app-mosdns" "v5" "" "v2dat"
 UPDATE_PACKAGE "openlist2" "sbwml/luci-app-openlist2" "main"
 UPDATE_PACKAGE "qbittorrent" "sbwml/luci-app-qbittorrent" "master" "" "qt6base qt6tools rblibtorrent"
 UPDATE_PACKAGE "quickfile" "sbwml/luci-app-quickfile" "main"
+
+# HomeProxy and companion packages share one source. This supplies the
+# sing-box version required by HomeProxy.
+UPDATE_PACKAGE "luci-app-homeproxy" "VIKINGYFY/packages" "main" "pkg" "axonhub gecoosac miniupnpd sing-box luci-app-timewol luci-app-upnp luci-app-wolplus luci-app-wolultra" "4a0f7553e5db085a5209b5ec0747b643716d6391"
 
 UPDATE_PACKAGE "ddns-go" "sirpdboy/luci-app-ddns-go" "main"
 UPDATE_PACKAGE "netspeedtest" "sirpdboy/netspeedtest" "main" "" "homebox ookla-speedtest"
@@ -137,6 +146,7 @@ UPDATE_PACKAGE "natmapt" "muink/openwrt-natmapt" "master"
 UPDATE_PACKAGE "stuntman" "muink/openwrt-stuntman" "master"
 UPDATE_PACKAGE "luci-app-natmapt" "muink/luci-app-natmapt" "master"
 
+# S20P modem and hardware utilities.
 UPDATE_PACKAGE "airpi3000m-fancontrol" "LianXia233/luci-app-airpi3000m-fancontrol" "main"
 UPDATE_PACKAGE "chfs" "LianXia233/luci-app-chfs" "main"
 UPDATE_PACKAGE "fm350" "LianXia233/luci-app-fm350" "main"
@@ -146,54 +156,7 @@ UPDATE_PACKAGE "mt5700m" "LianXia233/luci-app-mt5700m" "main"
 UPDATE_PACKAGE "netmonitor" "LianXia233/luci-app-netmonitor" "main"
 UPDATE_PACKAGE "qmodem-generic" "LianXia233/luci-app-qmodem-generic" "main"
 
-#更新软件包版本
-UPDATE_VERSION() {
-	local PKG_NAME=$1
-	local PKG_MARK=${2:-false}
-	local PKG_FILES=$(find ./package/ ./feeds/packages/ -maxdepth 3 -type f -wholename "*/$PKG_NAME/Makefile")
-
-	if [ -z "$PKG_FILES" ]; then
-		echo "$PKG_NAME not found!"
-		return
-	fi
-
-	echo -e "\n$PKG_NAME version update has started!"
-
-	for PKG_FILE in $PKG_FILES; do
-		local PKG_REPO=$(grep -Po "PKG_SOURCE_URL:=https://.*github.com/\K[^/]+/[^/]+(?=.*)" $PKG_FILE)
-		local PKG_TAG=$(curl -sL "https://api.github.com/repos/$PKG_REPO/releases" | jq -r "map(select(.prerelease == $PKG_MARK)) | first | .tag_name")
-
-		local OLD_VER=$(grep -Po "PKG_VERSION:=\K.*" "$PKG_FILE")
-		local OLD_URL=$(grep -Po "PKG_SOURCE_URL:=\K.*" "$PKG_FILE")
-		local OLD_FILE=$(grep -Po "PKG_SOURCE:=\K.*" "$PKG_FILE")
-		local OLD_HASH=$(grep -Po "PKG_HASH:=\K.*" "$PKG_FILE")
-
-		local PKG_URL=$([[ "$OLD_URL" == *"releases"* ]] && echo "${OLD_URL%/}/$OLD_FILE" || echo "${OLD_URL%/}")
-
-		local NEW_VER=$(echo $PKG_TAG | sed -E 's/[^0-9]+/\./g; s/^\.|\.$//g')
-		local NEW_URL=$(echo $PKG_URL | sed "s/\$(PKG_VERSION)/$NEW_VER/g; s/\$(PKG_NAME)/$PKG_NAME/g")
-		local NEW_HASH=$(curl -sL "$NEW_URL" | sha256sum | cut -d ' ' -f 1)
-
-		echo "old version: $OLD_VER $OLD_HASH"
-		echo "new version: $NEW_VER $NEW_HASH"
-
-		if [[ "$NEW_VER" =~ ^[0-9].* ]] && dpkg --compare-versions "$OLD_VER" lt "$NEW_VER"; then
-			sed -i "s/PKG_VERSION:=.*/PKG_VERSION:=$NEW_VER/g" "$PKG_FILE"
-			sed -i "s/PKG_HASH:=.*/PKG_HASH:=$NEW_HASH/g" "$PKG_FILE"
-			echo "$PKG_FILE version has been updated!"
-		else
-			echo "$PKG_FILE version is already the latest!"
-		fi
-	done
-}
-
-#UPDATE_VERSION "软件包名" "测试版，true，可选，默认为否"
-#UPDATE_VERSION "sing-box"
-
-#引入私有扩展脚本
-if [ -f "$GITHUB_WORKSPACE/Scripts/PRIVATE.sh" ]; then
+# Optional local extensions are deliberately kept outside the public tree.
+if [ -n "${GITHUB_WORKSPACE:-}" ] && [ -f "$GITHUB_WORKSPACE/Scripts/PRIVATE.sh" ]; then
 	source "$GITHUB_WORKSPACE/Scripts/PRIVATE.sh"
 fi
-
-
-# CI queue retry 2: remove stale package/feeds links at depth four before custom package copy.

@@ -37,6 +37,9 @@ on:
       WRT_SOURCE:
         required: true
         type: string
+      WRT_COMMIT:
+        required: false
+        type: string
       WRT_PACKAGE:
         required: false
         type: string
@@ -57,6 +60,7 @@ env:
   WRT_REPO: ${{inputs.WRT_REPO}}
   WRT_BRANCH: ${{inputs.WRT_BRANCH}}
   WRT_SOURCE: ${{inputs.WRT_SOURCE}}
+  WRT_COMMIT: ${{inputs.WRT_COMMIT}}
   WRT_PACKAGE: ${{inputs.WRT_PACKAGE}}
   WRT_TEST: ${{inputs.WRT_TEST}}
 
@@ -127,6 +131,10 @@ jobs:
 
           cd ./wrt/
           WRT_HASH=$(git rev-parse HEAD)
+          if [ -n "${WRT_COMMIT:-}" ] && [ "$WRT_HASH" != "$WRT_COMMIT" ]; then
+            echo "source-ref-drift: $WRT_REPO@$WRT_BRANCH expected $WRT_COMMIT got $WRT_HASH" >&2
+            exit 1
+          fi
           echo "WRT_HASH=$WRT_HASH" >> $GITHUB_ENV
           echo "WRT_CACHE_KEY=$WRT_CACHE_PREFIX-$WRT_HASH" >> $GITHUB_ENV
           echo "cache_key=$WRT_CACHE_PREFIX-$WRT_HASH" >> "$GITHUB_OUTPUT"
@@ -176,6 +184,7 @@ jobs:
 
           bash -n "$GITHUB_WORKSPACE/Scripts/Packages.sh"
           bash -n "$GITHUB_WORKSPACE/Scripts/Handles.sh"
+          bash -n "$GITHUB_WORKSPACE/.github/scripts/validate-build-contracts.sh"
           $GITHUB_WORKSPACE/Scripts/Packages.sh
           $GITHUB_WORKSPACE/Scripts/Handles.sh
           $GITHUB_WORKSPACE/.github/scripts/prepare-i2c-tools.sh
@@ -194,38 +203,34 @@ jobs:
           $GITHUB_WORKSPACE/Scripts/Settings.sh
           $GITHUB_WORKSPACE/.github/scripts/prepare-build-host.sh
 
-          # sing-box 使用 ImmortalWrt 官方 packages feed：该包自带完整的
-          # Naive outbound 配置和已验证的 system-libcronet 补丁，不在 CI 中动态改第三方源码。
-          SING_BOX_MAIN=""
-          for CANDIDATE in ./feeds/packages/net/sing-box ./package/feeds/packages/sing-box ./package/sing-box; do
-            if [ -f "$CANDIDATE/Makefile" ]; then
-              SING_BOX_MAIN="$CANDIDATE"
-              break
-            fi
-          done
-          if [ -z "$SING_BOX_MAIN" ]; then
-            echo "sing-box-official-source-not-found"
+          # sing-box has one canonical source: the VIKINGYFY package copied by
+          # Packages.sh. This keeps HomeProxy and the core on one version line.
+          SING_BOX_MAIN="./package/sing-box"
+          if [ ! -f "$SING_BOX_MAIN/Makefile" ]; then
+            echo "sing-box-source-not-found: $SING_BOX_MAIN/Makefile"
             exit 1
           fi
-          if [ -e ./package/sing-box/Makefile ] && [ "$SING_BOX_MAIN" != "./package/sing-box" ]; then
-            echo "unexpected-custom-sing-box-source: ./package/sing-box"
+          if [ -e ./feeds/packages/net/sing-box/Makefile ] || [ -e ./package/feeds/packages/sing-box/Makefile ]; then
+            echo "duplicate-sing-box-source-detected"
             exit 1
           fi
           SING_BOX_PATCH="$SING_BOX_MAIN/patches/100-use-system-libcronet.patch"
           if [ ! -s "$SING_BOX_PATCH" ]; then
-            echo "sing-box-official-libcronet-patch-missing: $SING_BOX_PATCH"
+            echo "sing-box-libcronet-patch-missing: $SING_BOX_PATCH"
             exit 1
           fi
-          if ! grep -q '^@@ -9,7 +9,6 @@ import (' "$SING_BOX_PATCH" || ! grep -q 'common/dialer' "$SING_BOX_PATCH"; then
-            echo "sing-box-official-libcronet-patch-incomplete: $SING_BOX_PATCH"
+          if ! grep -q '^@@ -9,7 +9,6 @@ import (' "$SING_BOX_PATCH" \
+            || ! grep -qF -- $'-\t_ "github.com/sagernet/cronet-go/all"' "$SING_BOX_PATCH" \
+            || ! grep -q 'common/dialer' "$SING_BOX_PATCH"; then
+            echo "sing-box-libcronet-patch-incomplete: $SING_BOX_PATCH"
             exit 1
           fi
-          echo "sing-box official source: $SING_BOX_MAIN/Makefile"
+          echo "sing-box canonical source: $SING_BOX_MAIN/Makefile"
           if ! grep -q 'with_naive_outbound' "$SING_BOX_MAIN/Makefile"; then
             echo "sing-box-naive-outbound-support-missing"
             exit 1
           fi
-          if ! grep -q '^CONFIG_SING_BOX_BUILD_NAIVE_OUTBOUND=y' .config; then
+          if [[ "${WRT_CONFIG:-}" == S20P* ]] && ! grep -q '^CONFIG_SING_BOX_BUILD_NAIVE_OUTBOUND=y' .config; then
             echo "sing-box-naive-outbound-config-missing"
             exit 1
           fi
@@ -263,25 +268,27 @@ jobs:
           done
           echo "critical package sources and definitions: present"
 
-          # OpenClash 的 Meta 核心下载命令会经过 BuildPackage 的二次 make 展开；
-          # 源文件必须保留四个 $，最终 recipe 才能保留一个 $CORE_ARCH。
-          OPENCLASH_MAKE="./package/luci-app-openclash/Makefile"
-          if ! grep -Eq '\$\$\$\$CORE_ARCH' "$OPENCLASH_MAKE" \
-            || ! grep -Eq 'clash-\$\$\$\$CORE_ARCH\.tar\.gz' "$OPENCLASH_MAKE"; then
-            echo "preflight-openclash-core-arch-escape-failed"
-            sed -n '/CORE_ARCH\|clash-.*CORE_ARCH/p' "$OPENCLASH_MAKE" || true
-            exit 1
+          if [[ "${WRT_CONFIG:-}" == S20P* ]]; then
+            # OpenClash 的 Meta 核心下载命令会经过 BuildPackage 的二次 make 展开；
+            # 源文件必须保留四个 $，最终 recipe 才能保留一个 $CORE_ARCH。
+            OPENCLASH_MAKE="./package/luci-app-openclash/Makefile"
+            if ! grep -Eq '\$\$\$\$CORE_ARCH' "$OPENCLASH_MAKE" \
+              || ! grep -Eq 'clash-\$\$\$\$CORE_ARCH\.tar\.gz' "$OPENCLASH_MAKE"; then
+              echo "preflight-openclash-core-arch-escape-failed"
+              sed -n '/CORE_ARCH\|clash-.*CORE_ARCH/p' "$OPENCLASH_MAKE" || true
+              exit 1
+            fi
+            if ! grep -q '^CONFIG_LUCI_APP_OPENCLASH_INCLUDE_CORE=y' .config; then
+              echo "preflight-openclash-core-selection-missing"
+              exit 1
+            fi
+            OPENCLASH_META_URL="https://raw.githubusercontent.com/vernesong/OpenClash/core/master/meta/clash-linux-arm64.tar.gz"
+            if ! curl -fILsS --retry 3 --connect-timeout 15 --max-time 60 "$OPENCLASH_META_URL" >/dev/null; then
+              echo "preflight-openclash-meta-core-unavailable: $OPENCLASH_META_URL"
+              exit 1
+            fi
+            echo "preflight-openclash-core: source expansion and Meta URL passed"
           fi
-          if ! grep -q '^CONFIG_LUCI_APP_OPENCLASH_INCLUDE_CORE=y' .config; then
-            echo "preflight-openclash-core-selection-missing"
-            exit 1
-          fi
-          OPENCLASH_META_URL="https://raw.githubusercontent.com/vernesong/OpenClash/core/master/meta/clash-linux-arm64.tar.gz"
-          if ! curl -fILsS --retry 3 --connect-timeout 15 --max-time 60 "$OPENCLASH_META_URL" >/dev/null; then
-            echo "preflight-openclash-meta-core-unavailable: $OPENCLASH_META_URL"
-            exit 1
-          fi
-          echo "preflight-openclash-core: source expansion and Meta URL passed"
 
           DEFCONFIG_LOG="$GITHUB_WORKSPACE/defconfig.log"
           if ! make defconfig -j$(nproc) 2>&1 | tee "$DEFCONFIG_LOG"; then
@@ -289,31 +296,35 @@ jobs:
             exit 1
           fi
 
-          # 直接解析 OpenClash 子包 Makefile，避免顶层 make 递归 host 依赖。
-          # -qp 只打印已展开的规则数据库，不执行 compile/prepare/install。
-          set -o pipefail
-          OPENCLASH_DRYRUN_LOG="$GITHUB_WORKSPACE/build-reports/preflight-openclash-compile-dryrun.log"
-          mkdir -p "$GITHUB_WORKSPACE/build-reports"
-          set +e
-          (
-            cd ./package/luci-app-openclash
-            make -qp -j1 V=s TOPDIR="$GITHUB_WORKSPACE/wrt"
-          ) >"$OPENCLASH_DRYRUN_LOG" 2>&1
-          OPENCLASH_MAKE_DB_STATUS=$?
-          set -e
-          if [ "$OPENCLASH_MAKE_DB_STATUS" -gt 1 ]; then
-            echo "preflight-openclash-make-database-failed: status=$OPENCLASH_MAKE_DB_STATUS"
-            tail -n 80 "$OPENCLASH_DRYRUN_LOG" || true
-            exit 1
+          $GITHUB_WORKSPACE/.github/scripts/validate-build-contracts.sh
+
+          if [[ "${WRT_CONFIG:-}" == S20P* ]]; then
+            # 直接解析 OpenClash 子包 Makefile，避免顶层 make 递归 host 依赖。
+            # -qp 只打印已展开的规则数据库，不执行 compile/prepare/install。
+            set -o pipefail
+            OPENCLASH_DRYRUN_LOG="$GITHUB_WORKSPACE/build-reports/preflight-openclash-compile-dryrun.log"
+            mkdir -p "$GITHUB_WORKSPACE/build-reports"
+            set +e
+            (
+              cd ./package/luci-app-openclash
+              make -qp -j1 V=s TOPDIR="$GITHUB_WORKSPACE/wrt"
+            ) >"$OPENCLASH_DRYRUN_LOG" 2>&1
+            OPENCLASH_MAKE_DB_STATUS=$?
+            set -e
+            if [ "$OPENCLASH_MAKE_DB_STATUS" -gt 1 ]; then
+              echo "preflight-openclash-make-database-failed: status=$OPENCLASH_MAKE_DB_STATUS"
+              tail -n 80 "$OPENCLASH_DRYRUN_LOG" || true
+              exit 1
+            fi
+            if grep -qF 'clash-ORE_ARCH.tar.gz' "$OPENCLASH_DRYRUN_LOG" \
+              || grep -qF '"ORE_ARCH"' "$OPENCLASH_DRYRUN_LOG" \
+              || ! grep -Eq 'clash-.*CORE_ARCH\.tar\.gz' "$OPENCLASH_DRYRUN_LOG"; then
+              echo "preflight-openclash-expanded-recipe-failed"
+              grep -nE 'CORE_ARCH|clash-' "$OPENCLASH_DRYRUN_LOG" | tail -n 40 || true
+              exit 1
+            fi
+            echo "preflight-openclash-expanded-recipe: passed"
           fi
-          if grep -qF 'clash-ORE_ARCH.tar.gz' "$OPENCLASH_DRYRUN_LOG" \
-            || grep -qF '"ORE_ARCH"' "$OPENCLASH_DRYRUN_LOG" \
-            || ! grep -Eq 'clash-.*CORE_ARCH\.tar\.gz' "$OPENCLASH_DRYRUN_LOG"; then
-            echo "preflight-openclash-expanded-recipe-failed"
-            grep -nE 'CORE_ARCH|clash-' "$OPENCLASH_DRYRUN_LOG" | tail -n 40 || true
-            exit 1
-          fi
-          echo "preflight-openclash-expanded-recipe: passed"
 
           # defconfig 会扫描所有 feeds，即使未选中的可选包也可能发出不存在依赖警告。
           # 只对 .config 实际选中的包判定为阻塞，避免把未参与本固件的包误报成失败。
@@ -332,18 +343,24 @@ jobs:
             exit 1
           fi
 
-          if ! grep -q '^CONFIG_PACKAGE_sing-box=y' .config; then
-            echo "sing-box-defconfig-missing"
-            grep -R "define Package/sing-box" ./package ./feeds 2>/dev/null | head -n 20 || true
-            exit 1
-          fi
-          for REQUIRED in mihomo naiveproxy xray-core v2ray-core hysteria tuic-client docker docker-compose dockerd luci-app-store; do
-            if ! grep -q "^CONFIG_PACKAGE_"$REQUIRED"=y" .config; then
-              echo "required-package-missing: "$REQUIRED""
+          if [[ "${WRT_CONFIG:-}" == S20P* ]]; then
+            if ! grep -q '^CONFIG_PACKAGE_sing-box=y' .config; then
+              echo "sing-box-defconfig-missing"
+              grep -R "define Package/sing-box" ./package ./feeds 2>/dev/null | head -n 20 || true
               exit 1
             fi
-          done
-          echo "sing-box and required package selections: enabled"
+            for REQUIRED in \
+              luci-app-passwall luci-app-passwall2 luci-app-ssr-plus luci-app-openclash \
+              luci-app-store luci-app-homeproxy luci-lib-docker luci-app-dockerman \
+              docker docker-compose dockerd sing-box mihomo xray-core v2ray-core \
+              hysteria naiveproxy tuic-client tuic-server trojan; do
+              if ! grep -q "^CONFIG_PACKAGE_"$REQUIRED"=y" .config; then
+                echo "required-package-missing: "$REQUIRED""
+                exit 1
+              fi
+            done
+            echo "sing-box and required package selections: enabled"
+          fi
 
       - name: Preflight Package Metadata
         if: ${{ !inputs.WRT_TEST }}
@@ -382,13 +399,19 @@ jobs:
             exit 1
           fi
 
-          # 关键包必须仍然由实体 Makefile 提供，且配置没有被 defconfig 清掉。
-          for REQUIRED in sing-box mihomo naiveproxy xray-core v2ray-core hysteria tuic-client tuic-server docker docker-compose dockerd luci-lib-docker luci-app-dockerman luci-app-store; do
-            if ! grep -q "^CONFIG_PACKAGE_$REQUIRED=y" .config; then
-              echo "preflight-required-package-missing: $REQUIRED"
-              exit 1
-            fi
-          done
+          if [[ "${WRT_CONFIG:-}" == S20P* ]]; then
+            # 关键包必须仍然由实体 Makefile 提供，且配置没有被 defconfig 清掉。
+            for REQUIRED in \
+              luci-app-passwall luci-app-passwall2 luci-app-ssr-plus luci-app-openclash \
+              luci-app-store luci-app-homeproxy luci-lib-docker luci-app-dockerman \
+              docker docker-compose dockerd sing-box mihomo xray-core v2ray-core \
+              hysteria naiveproxy tuic-client tuic-server trojan; do
+              if ! grep -q "^CONFIG_PACKAGE_$REQUIRED=y" .config; then
+                echo "preflight-required-package-missing: $REQUIRED"
+                exit 1
+              fi
+            done
+          fi
           echo "preflight-package-metadata-audit: passed"
 
       - name: Prepare Rust Toolchain
@@ -439,13 +462,13 @@ jobs:
               "https://github.com/bootmortis/iran-hosted-domains/releases/download/$GEOSITE_IRAN_VER/iran.dat"
           fi
 
-      - name: Preflight sing-box source patch
+      - name: Preflight sing-box source
         if: ${{ !inputs.WRT_TEST }}
         run: |
           cd ./wrt/
           set -o pipefail
           mkdir -p "$GITHUB_WORKSPACE/build-reports"
-          # 只执行 sing-box 的下载、解包和补丁应用，不编译 Go；补丁失败在分钟级暴露。
+          # 只执行 sing-box 的下载、解包和补丁应用，不编译 Go。
           if ! make package/sing-box/prepare -j1 V=s 2>&1 | tee "$GITHUB_WORKSPACE/build-reports/preflight-sing-box-prepare.log"; then
             echo "preflight-sing-box-prepare-failed"
             exit 1
@@ -543,16 +566,18 @@ jobs:
             echo "firmware-manifest-missing"
             exit 1
           fi
-          for REQUIRED in \
-            luci-app-passwall luci-app-passwall2 luci-app-ssr-plus luci-app-openclash \
-            luci-app-store luci-app-homeproxy luci-lib-docker luci-app-dockerman \
-            docker docker-compose dockerd sing-box mihomo xray-core v2ray-core \
-            hysteria naiveproxy tuic-client tuic-server trojan; do
-            if ! grep -Eq "^${REQUIRED}([[:space:]]|$)" "$MANIFEST"; then
-              echo "firmware-manifest-missing-package: $REQUIRED"
-              exit 1
-            fi
-          done
+          if [[ "${WRT_CONFIG:-}" == S20P* ]]; then
+            for REQUIRED in \
+              luci-app-passwall luci-app-passwall2 luci-app-ssr-plus luci-app-openclash \
+              luci-app-store luci-app-homeproxy luci-lib-docker luci-app-dockerman \
+              docker docker-compose dockerd sing-box mihomo xray-core v2ray-core \
+              hysteria naiveproxy tuic-client tuic-server trojan; do
+              if ! grep -Eq "^${REQUIRED}([[:space:]]|$)" "$MANIFEST"; then
+                echo "firmware-manifest-missing-package: $REQUIRED"
+                exit 1
+              fi
+            done
+          fi
           SYSUPGRADE=$(find ./bin/targets -type f -iname '*sysupgrade*.bin' -print -quit)
           if [ -z "$SYSUPGRADE" ]; then
             echo "sysupgrade-image-missing"
@@ -629,11 +654,8 @@ jobs:
           tag_name: ${{env.WRT_CONFIG}}-${{env.WRT_INFO}}-${{env.WRT_BRANCH}}-${{env.WRT_DATE}}
           files: ./wrt/upload/*.*
           body: |
-            这是个平台固件包，内含多个设备！
-            请注意选择你需要的设备固件！
-            不要问，刷就完事了！
-
-            全系带开源硬件加速，别问了！
+            OpenWrt firmware build generated by OpenWRT-CI.
+            Select the image matching your device profile.
 
             源码：${{env.WRT_REPO}}
             分支：${{env.WRT_BRANCH}}

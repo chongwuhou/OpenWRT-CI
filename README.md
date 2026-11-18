@@ -1,69 +1,51 @@
-# 高质量<免费>交流群
+# OpenWRT-CI
 
 [IPQ技术讨论群](https://qm.qq.com/q/v7nMhzB4oU)
 
-# 高质量<付费>中转站
+## 相关项目
 
-[Krill-Code](https://www.krill-code.com/register?invite=959NHQCZGT)
+本地编译工具：[OWRT-Tools](https://github.com/VIKINGYFY/OWRT-Tools)
 
-# 本地编译器
+配套插件：[packages](https://github.com/VIKINGYFY/packages)
 
-https://github.com/VIKINGYFY/OWRT-Tools.git
+上游源码：[ImmortalWrt](https://github.com/immortalwrt/immortalwrt)
 
-# 自用修改版插件
+定制源码：[VIKINGYFY/immortalwrt](https://github.com/VIKINGYFY/immortalwrt)
 
-https://github.com/VIKINGYFY/packages.git
+## U-Boot
 
-# OpenWRT-CI
+高通版（沉心）：[uboot-qsdk12.5-build](https://github.com/chenxin527/uboot-qsdk12.5-build)
 
-官方版：
+高通版（小猪）：[u-boot-2016](https://github.com/1980490718/u-boot-2016)
 
-https://github.com/immortalwrt/immortalwrt.git
+联发科（新版）：[UBOOT-CI Releases](https://github.com/VIKINGYFY/UBOOT-CI/releases)
 
-自用版：
+联发科（官方）：[wrt.moe](https://drive.wrt.moe/uboot/mediatek)
 
-https://github.com/VIKINGYFY/immortalwrt.git
+## 固件说明
 
-# U-BOOT
+平台工作流按矩阵管理；S20P 使用 `S20P` 工作流手动触发，避免诊断和修复提交自动消耗 runner。
 
-高通版-沉心：
+S20P 同时锁定源码和关键第三方软件包提交号；上游发生漂移时会在下载阶段直接停止。
 
-https://github.com/chenxin527/uboot-qsdk12.5-build.git
+固件信息中的时间为编译开始时间，可用于核对上游源码提交。
 
-高通版-小猪：
+当前配置覆盖 MediaTek、Qualcomm、Rockchip 和 x86 系列。
 
-https://github.com/1980490718/u-boot-2016.git
+## 目录
 
-联发科-全新版：
+`.github/workflows`：GitHub Actions 工作流
 
-https://github.com/VIKINGYFY/UBOOT-CI/releases
+`Scripts`：包源和源码调整脚本
 
-联发科-官方版：
-
-https://drive.wrt.moe/uboot/mediatek
-
-# 固件简要说明
-
-固件每天早上5点自动编译。
-
-固件信息里的时间为编译开始的时间，方便核对上游源码提交时间。
-
-MEDIATEK系列、QUALCOMMAX系列、ROCKCHIP系列、X86系列。
-
-# 目录简要说明
-
-workflows——自定义CI配置
-
-Scripts——自定义脚本
-
-Config——自定义配置
+`Config`：平台与软件包配置
 
 ## Star History
 
 <a href="https://www.star-history.com/?repos=vikingyfy%2Fopenwrt-ci&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=vikingyfy/openwrt-ci&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=vikingyfy/openwrt-ci&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=vikingyfy/openwrt-ci&type=date&legend=top-left" />
- </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=vikingyfy/openwrt-ci&type=date&theme=dark&legend=top-left" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=vikingyfy/openwrt-ci&type=date&legend=top-left" />
+    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=vikingyfy/openwrt-ci&type=date&legend=top-left" />
+  </picture>
 </a>

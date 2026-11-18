@@ -35,6 +35,7 @@ jobs:
       WRT_REPO: https://github.com/VIKINGYFY/immortalwrt.git
       WRT_BRANCH: owrt
       WRT_SOURCE: VIKINGYFY/immortalwrt
+      WRT_COMMIT: 3f174ba4fa59d014f37b11dcb0d1714dbbe85bb8
       WRT_PACKAGE: ${{inputs.PACKAGE}}
       WRT_TEST: ${{inputs.TEST || false}}
 
