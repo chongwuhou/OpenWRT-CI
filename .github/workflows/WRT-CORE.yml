@@ -289,20 +289,26 @@ jobs:
             exit 1
           fi
 
-          # 用真实 OpenWrt Make 展开做一次无执行试跑，验证最终 recipe 不会变成 ORE_ARCH。
-          # 这是对静态 grep 的补充，能捕获 BuildPackage 的二次展开问题。
+          # 用 GNU Make 的规则数据库做纯展开检查，不执行目标，也不递归构建 host 依赖。
+          # 这样能验证 BuildPackage 的变量展开，同时避免 make -n 触发 package/system/apk 等前置构建。
           set -o pipefail
           OPENCLASH_DRYRUN_LOG="$GITHUB_WORKSPACE/build-reports/preflight-openclash-compile-dryrun.log"
           mkdir -p "$GITHUB_WORKSPACE/build-reports"
-          if ! make -n package/luci-app-openclash/compile -j1 V=s 2>&1 | tee "$OPENCLASH_DRYRUN_LOG"; then
-            echo "preflight-openclash-dryrun-failed"
+          set +e
+          make -qp -j1 V=s >"$OPENCLASH_DRYRUN_LOG" 2>&1
+          OPENCLASH_MAKE_DB_STATUS=$?
+          set -e
+          if [ "$OPENCLASH_MAKE_DB_STATUS" -gt 1 ]; then
+            echo "preflight-openclash-make-database-failed: status=$OPENCLASH_MAKE_DB_STATUS"
+            tail -n 80 "$OPENCLASH_DRYRUN_LOG" || true
             exit 1
           fi
-          if grep -qF 'clash-ORE_ARCH.tar.gz' "$OPENCLASH_DRYRUN_LOG" \
+          if ! grep -qF 'package/luci-app-openclash/compile' "$OPENCLASH_DRYRUN_LOG" \
+            || grep -qF 'clash-ORE_ARCH.tar.gz' "$OPENCLASH_DRYRUN_LOG" \
             || grep -qF '"ORE_ARCH"' "$OPENCLASH_DRYRUN_LOG" \
             || ! grep -Eq 'clash-.*CORE_ARCH\.tar\.gz' "$OPENCLASH_DRYRUN_LOG"; then
             echo "preflight-openclash-expanded-recipe-failed"
-            grep -nE 'CORE_ARCH|clash-' "$OPENCLASH_DRYRUN_LOG" | tail -n 20 || true
+            grep -nE 'package/luci-app-openclash/compile|CORE_ARCH|clash-' "$OPENCLASH_DRYRUN_LOG" | tail -n 40 || true
             exit 1
           fi
           echo "preflight-openclash-expanded-recipe: passed"
