@@ -100,6 +100,13 @@ if [ -f "$DOCKERMAN_MAKE" ] && grep -q '^PKG_VERSION:=v' "$DOCKERMAN_MAKE"; then
 		's/^PKG_VERSION:=v/PKG_VERSION:=/' \
 		"$DOCKERMAN_MAKE"
 fi
+# OpenClash：OpenWrt Makefile 中的 shell 变量必须写成 $CORE_ARCH。
+# 单个 $CORE_ARCH 会被 GNU make 当作 $C + ORE_ARCH，最终生成错误的 clash-ORE_ARCH.tar.gz。
+OPENCLASH_MAKE="$PACKAGE_PATH/luci-app-openclash/Makefile"
+if [ -f "$OPENCLASH_MAKE" ] && grep -Eq '([^$]|^)\$CORE_ARCH' "$OPENCLASH_MAKE"; then
+	FIX "openclash-core-arch-make-escape" "$PACKAGE_PATH/luci-app-openclash" sed -E -i 		's/([^$])\$CORE_ARCH/\1\$\$CORE_ARCH/g' 		"$OPENCLASH_MAKE"
+fi
+
 # nps-openwrt 当前 main 将预编译包版本占位为 null；这会生成无效下载/打包元数据。
 # 固定到官方最新发布，并同步 S20P aarch64 的 client/server 校验值。
 NPS_VERSION="0.35.3"
@@ -156,6 +163,14 @@ if [[ "${WRT_CONFIG:-}" == S20P* ]]; then
 	fi
 	if ! grep -qF '$(STAGING_DIR_HOSTPKG)/bin/upx' "$MIHOMO_MAKE"; then
 		echo "S20P mihomo UPX path assertion failed: missing STAGING_DIR_HOSTPKG"
+		exit 1
+	fi
+	if [ ! -f "$OPENCLASH_MAKE" ]; then
+		echo "required S20P OpenClash Makefile missing: $OPENCLASH_MAKE"
+		exit 1
+	fi
+	if ! grep -Eq '\$\$CORE_ARCH' "$OPENCLASH_MAKE" 		|| ! grep -Eq 'clash-\$\$CORE_ARCH\.tar\.gz' "$OPENCLASH_MAKE"; then
+		echo "S20P OpenClash core architecture expansion assertion failed: expected \\$CORE_ARCH in $OPENCLASH_MAKE"
 		exit 1
 	fi
 fi

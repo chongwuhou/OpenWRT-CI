@@ -265,6 +265,25 @@ jobs:
           done
           echo "critical package sources and definitions: present"
 
+          # OpenClash 的 Meta 核心下载命令必须保留 shell 变量转义；
+          # 否则 GNU make 会把 $C 吃掉，生成 clash-ORE_ARCH.tar.gz，数小时后才在编译阶段 404。
+          OPENCLASH_MAKE="./package/luci-app-openclash/Makefile"
+          if ! grep -Eq '\$\$CORE_ARCH' "$OPENCLASH_MAKE"             || ! grep -Eq 'clash-\$\$CORE_ARCH\.tar\.gz' "$OPENCLASH_MAKE"; then
+            echo "preflight-openclash-core-arch-escape-failed"
+            sed -n '/CORE_ARCH\|clash-.*CORE_ARCH/p' "$OPENCLASH_MAKE" || true
+            exit 1
+          fi
+          if ! grep -q '^CONFIG_LUCI_APP_OPENCLASH_INCLUDE_CORE=y' .config; then
+            echo "preflight-openclash-core-selection-missing"
+            exit 1
+          fi
+          OPENCLASH_META_URL="https://raw.githubusercontent.com/vernesong/OpenClash/core/master/meta/clash-linux-arm64.tar.gz"
+          if ! curl -fILsS --retry 3 --connect-timeout 15 --max-time 60 "$OPENCLASH_META_URL" >/dev/null; then
+            echo "preflight-openclash-meta-core-unavailable: $OPENCLASH_META_URL"
+            exit 1
+          fi
+          echo "preflight-openclash-core: source expansion and Meta URL passed"
+
           DEFCONFIG_LOG="$GITHUB_WORKSPACE/defconfig.log"
           if ! make defconfig -j$(nproc) 2>&1 | tee "$DEFCONFIG_LOG"; then
             echo "defconfig-failed"
