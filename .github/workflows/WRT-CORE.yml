@@ -265,10 +265,11 @@ jobs:
           done
           echo "critical package sources and definitions: present"
 
-          # OpenClash 的 Meta 核心下载命令必须保留 shell 变量转义；
-          # 否则 GNU make 会把 $C 吃掉，生成 clash-ORE_ARCH.tar.gz，数小时后才在编译阶段 404。
+          # OpenClash 的 Meta 核心下载命令会经过 BuildPackage 的二次 make 展开；
+          # 源文件必须保留四个 $，最终 recipe 才能保留一个 $CORE_ARCH。
           OPENCLASH_MAKE="./package/luci-app-openclash/Makefile"
-          if ! grep -Eq '\$\$CORE_ARCH' "$OPENCLASH_MAKE"             || ! grep -Eq 'clash-\$\$CORE_ARCH\.tar\.gz' "$OPENCLASH_MAKE"; then
+          if ! grep -Eq '\$\$\$\$CORE_ARCH' "$OPENCLASH_MAKE" \
+            || ! grep -Eq 'clash-\$\$\$\$CORE_ARCH\.tar\.gz' "$OPENCLASH_MAKE"; then
             echo "preflight-openclash-core-arch-escape-failed"
             sed -n '/CORE_ARCH\|clash-.*CORE_ARCH/p' "$OPENCLASH_MAKE" || true
             exit 1
@@ -289,6 +290,24 @@ jobs:
             echo "defconfig-failed"
             exit 1
           fi
+
+          # 用真实 OpenWrt Make 展开做一次无执行试跑，验证最终 recipe 不会变成 ORE_ARCH。
+          # 这是对静态 grep 的补充，能捕获 BuildPackage 的二次展开问题。
+          set -o pipefail
+          OPENCLASH_DRYRUN_LOG="$GITHUB_WORKSPACE/build-reports/preflight-openclash-compile-dryrun.log"
+          mkdir -p "$GITHUB_WORKSPACE/build-reports"
+          if ! make -n package/luci-app-openclash/compile -j1 V=s 2>&1 | tee "$OPENCLASH_DRYRUN_LOG"; then
+            echo "preflight-openclash-dryrun-failed"
+            exit 1
+          fi
+          if grep -qF 'clash-ORE_ARCH.tar.gz' "$OPENCLASH_DRYRUN_LOG" \
+            || grep -qF '"ORE_ARCH"' "$OPENCLASH_DRYRUN_LOG" \
+            || ! grep -Eq 'clash-.*CORE_ARCH\.tar\.gz' "$OPENCLASH_DRYRUN_LOG"; then
+            echo "preflight-openclash-expanded-recipe-failed"
+            grep -nE 'CORE_ARCH|clash-' "$OPENCLASH_DRYRUN_LOG" | tail -n 20 || true
+            exit 1
+          fi
+          echo "preflight-openclash-expanded-recipe: passed"
 
           # defconfig 会扫描所有 feeds，即使未选中的可选包也可能发出不存在依赖警告。
           # 只对 .config 实际选中的包判定为阻塞，避免把未参与本固件的包误报成失败。

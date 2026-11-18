@@ -100,11 +100,20 @@ if [ -f "$DOCKERMAN_MAKE" ] && grep -q '^PKG_VERSION:=v' "$DOCKERMAN_MAKE"; then
 		's/^PKG_VERSION:=v/PKG_VERSION:=/' \
 		"$DOCKERMAN_MAKE"
 fi
-# OpenClash：OpenWrt Makefile 中的 shell 变量必须写成 $CORE_ARCH。
-# 单个 $CORE_ARCH 会被 GNU make 当作 $C + ORE_ARCH，最终生成错误的 clash-ORE_ARCH.tar.gz。
+# OpenClash：BuildPackage 会对 recipe 做两次 GNU make 展开；
+# 四个 $ 才能让最终交给 shell 的 recipe 保留一个 $CORE_ARCH。
+# 只做幂等归一化，不改下载地址、核心选择或插件功能。
 OPENCLASH_MAKE="$PACKAGE_PATH/luci-app-openclash/Makefile"
-if [ -f "$OPENCLASH_MAKE" ] && grep -Eq '([^$]|^)\$CORE_ARCH' "$OPENCLASH_MAKE"; then
-	FIX "openclash-core-arch-make-escape" "$PACKAGE_PATH/luci-app-openclash" sed -E -i 		's/([^$])\$CORE_ARCH/\1\$\$CORE_ARCH/g' 		"$OPENCLASH_MAKE"
+NORMALIZE_OPENCLASH_ARCH() {
+	local MAKEFILE=$1
+	local TMPFILE="${MAKEFILE}.tmp"
+	awk '{
+		gsub(/\$+CORE_ARCH/, "$$$$CORE_ARCH")
+		print
+	}' "$MAKEFILE" > "$TMPFILE" && mv "$TMPFILE" "$MAKEFILE"
+}
+if [ -f "$OPENCLASH_MAKE" ] && grep -q 'CORE_ARCH' "$OPENCLASH_MAKE"; then
+	FIX "openclash-core-arch-make-escape" "$PACKAGE_PATH/luci-app-openclash" 		NORMALIZE_OPENCLASH_ARCH "$OPENCLASH_MAKE"
 fi
 
 # nps-openwrt 当前 main 将预编译包版本占位为 null；这会生成无效下载/打包元数据。
@@ -169,8 +178,9 @@ if [[ "${WRT_CONFIG:-}" == S20P* ]]; then
 		echo "required S20P OpenClash Makefile missing: $OPENCLASH_MAKE"
 		exit 1
 	fi
-	if ! grep -Eq '\$\$CORE_ARCH' "$OPENCLASH_MAKE" 		|| ! grep -Eq 'clash-\$\$CORE_ARCH\.tar\.gz' "$OPENCLASH_MAKE"; then
-		echo "S20P OpenClash core architecture expansion assertion failed: expected \\$CORE_ARCH in $OPENCLASH_MAKE"
+	if ! grep -Eq '\$\$\$\$CORE_ARCH' "$OPENCLASH_MAKE" \
+		|| ! grep -Eq 'clash-\$\$\$\$CORE_ARCH\.tar\.gz' "$OPENCLASH_MAKE"; then
+		echo "S20P OpenClash core architecture expansion assertion failed: expected four-dollar CORE_ARCH in $OPENCLASH_MAKE"
 		exit 1
 	fi
 fi
