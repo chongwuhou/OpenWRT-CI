@@ -495,8 +495,27 @@ jobs:
               "$LOG_DIR/compile-parallel.log" | tr -d '\r' | sort -u
           )
           if [ "${#FAILED_PACKAGES[@]}" -eq 0 ]; then
-            echo "parallel build failed without a package-level error; preserve the full log and stop"
-            exit "$PARALLEL_STATUS"
+            echo "parallel build failed without a package-level error; run serial install diagnostics"
+
+            set +e
+            make -j1 V=s BUILD_LOG=1 BUILD_TIME_LOG="$LOG_DIR/install-package.tsv" package/install 2>&1 | \
+              tee "$LOG_DIR/install-package.log"
+            PACKAGE_INSTALL_STATUS=${PIPESTATUS[0]}
+            set -e
+            if [ "$PACKAGE_INSTALL_STATUS" -ne 0 ]; then
+              echo "package/install diagnostic failed"
+              exit "$PACKAGE_INSTALL_STATUS"
+            fi
+
+            set +e
+            make -j1 V=s BUILD_LOG=1 BUILD_TIME_LOG="$LOG_DIR/install-target.tsv" target/install 2>&1 | \
+              tee "$LOG_DIR/install-target.log"
+            TARGET_INSTALL_STATUS=${PIPESTATUS[0]}
+            set -e
+            if [ "$TARGET_INSTALL_STATUS" -ne 0 ]; then
+              echo "target/install diagnostic failed"
+              exit "$TARGET_INSTALL_STATUS"
+            fi
           fi
 
           for PKG in "${FAILED_PACKAGES[@]}"; do
