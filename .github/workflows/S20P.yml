@@ -4,15 +4,7 @@
 name: S20P
 
 on:
-  # 临时受控触发：仅用于本次用户授权的云编译，完成后恢复。
-  push:
-    paths:
-      - Config/S20P-WIFI-YES.txt
-      - Scripts/Packages.sh
-      - Scripts/Handles.sh
-      - Scripts/Settings.sh
-      - .github/workflows/WRT-CORE.yml
-      - .github/workflows/S20P.yml
+  # 仅手动触发：诊断提交和后续修复不会自动消耗 runner。
   workflow_dispatch:
     inputs:
       PACKAGE:
